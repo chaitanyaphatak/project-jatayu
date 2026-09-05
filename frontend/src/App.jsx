@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useUser, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
+import { useUser, useAuth } from '@clerk/clerk-react'
 
 // Layout Components
 import Sidebar from './components/Sidebar'
@@ -23,8 +23,23 @@ export default function App() {
   const { isSignedIn, user } = useUser()
   const { getToken } = useAuth()
 
-  // Active Pan-India Location State
-  const [currentLocation, setCurrentLocation] = useState({
+  // ─── localStorage helpers ───────────────────────────────────────────────────
+  // Keys are namespaced by Clerk user ID so each user gets their own data
+  const lsKey = (key) => `wgpt_${user?.id || 'guest'}_${key}`
+
+  const lsRead = (key, fallback) => {
+    try {
+      const raw = localStorage.getItem(lsKey(key))
+      return raw ? JSON.parse(raw) : fallback
+    } catch { return fallback }
+  }
+
+  const lsWrite = (key, value) => {
+    try { localStorage.setItem(lsKey(key), JSON.stringify(value)) } catch {}
+  }
+
+  // Default fallback location
+  const DEFAULT_LOCATION = {
     name: 'Pune (Haveli), Maharashtra',
     state: 'Maharashtra',
     region: 'West',
@@ -33,12 +48,17 @@ export default function App() {
     type: 'Agri-Metro Hub',
     crop: 'Soybean & Sugarcane',
     risk: 'Convective Updraft & Showers'
-  })
+  }
 
-  // User Profile & Role State
-  const [userRole, setUserRole] = useState('farmer') // 'farmer' | 'pilot' | 'citizen' | 'disaster_manager'
-  const [cropStage, setCropStage] = useState('Flowering & Pod Formation (Soybean)')
-  const [trustScore, setTrustScore] = useState(120)
+  // Active Pan-India Location State — restored from localStorage on load
+  const [currentLocation, setCurrentLocation] = useState(() =>
+    lsRead('location', DEFAULT_LOCATION)
+  )
+
+  // User Profile & Role State — restored from localStorage
+  const [userRole, setUserRole] = useState(() => lsRead('role', 'farmer'))
+  const [cropStage, setCropStage] = useState(() => lsRead('cropStage', 'Flowering & Pod Formation (Soybean)'))
+  const [trustScore, setTrustScore] = useState(() => lsRead('trustScore', 120))
 
   // Modals & Mobile Drawer State
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
@@ -167,12 +187,34 @@ export default function App() {
     }
   }
 
-  // Handle location selection
+  // Handle location selection — persist to localStorage
   const handleSelectLocation = (loc) => {
     setCurrentLocation(loc)
+    lsWrite('location', loc)
     fetchLiveWeather(loc.lat, loc.lon, loc.name)
     fetchLiveAlerts(loc.lat, loc.lon)
     fetchCrowdData(loc.lat, loc.lon)
+  }
+
+  // Persist role changes
+  const handleSetUserRole = (role) => {
+    setUserRole(role)
+    lsWrite('role', role)
+  }
+
+  // Persist cropStage changes
+  const handleSetCropStage = (stage) => {
+    setCropStage(stage)
+    lsWrite('cropStage', stage)
+  }
+
+  // Persist trustScore changes
+  const handleAddTrustScore = (delta) => {
+    setTrustScore(prev => {
+      const next = prev + delta
+      lsWrite('trustScore', next)
+      return next
+    })
   }
 
   // Handle GPS location detection
@@ -213,7 +255,25 @@ export default function App() {
     return () => clearInterval(interval)
   }, [currentLocation, userRole, cropStage])
 
-  // Sync profile with Clerk on sign-in
+  // ─── On sign-in: Restore user-specific data from localStorage ──────────────
+  // When a user authenticates, load their saved location, role, trustScore
+  useEffect(() => {
+    if (isSignedIn && user) {
+      // Restore user-specific localStorage data (keyed by user ID)
+      const savedLocation = lsRead('location', null)
+      const savedRole = lsRead('role', null)
+      const savedCropStage = lsRead('cropStage', null)
+      const savedTrustScore = lsRead('trustScore', null)
+
+      if (savedLocation) setCurrentLocation(savedLocation)
+      if (savedRole) setUserRole(savedRole)
+      if (savedCropStage) setCropStage(savedCropStage)
+      if (savedTrustScore !== null) setTrustScore(savedTrustScore)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, user?.id])
+
+  // ─── Sync profile to backend on sign-in ─────────────────────────────────────
   useEffect(() => {
     async function syncBackendProfile() {
       if (isSignedIn && user) {
@@ -238,7 +298,7 @@ export default function App() {
       }
     }
     syncBackendProfile()
-  }, [isSignedIn, user, userRole, cropStage])
+  }, [isSignedIn, user?.id])
 
   // Handle Ground Report Submission
   const handleSubmitReport = async (reportData) => {
@@ -257,7 +317,7 @@ export default function App() {
       })
     })
     if (res.ok) {
-      setTrustScore(prev => prev + 15)
+      handleAddTrustScore(15)
       fetchCrowdData()
     }
   }
@@ -293,7 +353,7 @@ export default function App() {
             onDetectLocation={handleDetectGPSLocation}
             systemAlert={systemAlert}
             userRole={userRole}
-            setUserRole={setUserRole}
+            setUserRole={handleSetUserRole}
             onOpenReportModal={() => setIsReportModalOpen(true)}
             trustScore={trustScore}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
@@ -408,15 +468,14 @@ export default function App() {
                     user={user}
                     isSignedIn={isSignedIn}
                     userRole={userRole}
-                    setUserRole={setUserRole}
+                    setUserRole={handleSetUserRole}
                     cropStage={cropStage}
-                    setCropStage={setCropStage}
+                    setCropStage={handleSetCropStage}
                     currentLocation={currentLocation}
                     onSelectLocation={handleSelectLocation}
                   />
                 } 
               />
-              <Route path="/sso-callback" element={<AuthenticateWithRedirectCallback />} />
               <Route path="*" element={<Navigate to="/overview" replace />} />
             </Routes>
           </main>

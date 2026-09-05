@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
 import { 
-  Settings, User, MapPin, Globe, Bell, Shield, ShieldCheck,
-  Check, Plus, Trash2, Sprout, Plane, Flame, Building2, LogIn, CheckCircle2
+  Settings, User, MapPin, Globe, Bell, ShieldCheck,
+  Plus, Trash2, Sprout, Plane, Flame, Building2, LogIn, CheckCircle2
 } from 'lucide-react'
-import GoogleSignInButton, { GoogleIcon } from '../components/GoogleAuthButton'
 
 export default function SettingsPage({ 
   user, 
@@ -29,6 +28,9 @@ export default function SettingsPage({
     { id: 3, name: 'Ludhiana Farm (Wheat/Paddy)', lat: 30.9010, lon: 75.8573, crop: 'Basmati Rice' }
   ])
   const [newFarmName, setNewFarmName] = useState('')
+
+  // Detect Google OAuth user
+  const isGoogleUser = user?.externalAccounts?.some(acc => acc.provider === 'oauth_google')
 
   const handleAddFarm = (e) => {
     e.preventDefault()
@@ -64,22 +66,24 @@ export default function SettingsPage({
         </p>
       </div>
 
-      {/* Account & Google Authentication Card */}
+      {/* Account & Security Card */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-sky-600" />
-            Account Authentication & Security
+            Account & Authentication
           </h3>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-            OAuth 2.0 / SSO
+            Clerk SSO
           </span>
         </div>
 
+        {/* Signed In State */}
         <SignedIn>
           <div className="p-4 rounded-2xl bg-gradient-to-r from-sky-50/70 via-blue-50/40 to-slate-50 border border-sky-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
-              <div className="relative">
+              {/* Avatar */}
+              <div className="relative shrink-0">
                 {user?.imageUrl ? (
                   <img 
                     src={user.imageUrl} 
@@ -87,8 +91,8 @@ export default function SettingsPage({
                     className="w-12 h-12 rounded-2xl object-cover ring-2 ring-sky-200 shadow-xs"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-2xl bg-sky-600 text-white flex items-center justify-center font-black text-base shadow-xs">
-                    {user?.firstName?.[0] || 'U'}
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center font-black text-base shadow-xs">
+                    {user?.firstName?.[0] || user?.primaryEmailAddress?.emailAddress?.[0]?.toUpperCase() || 'U'}
                   </div>
                 )}
                 <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white flex items-center justify-center text-[9px] text-white font-bold">
@@ -96,60 +100,59 @@ export default function SettingsPage({
                 </span>
               </div>
 
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-extrabold text-sm text-slate-900">
-                    {user?.fullName || user?.firstName || 'Authenticated Member'}
+              {/* User Info */}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-extrabold text-sm text-slate-900 truncate">
+                    {user?.fullName || user?.firstName || 'Authenticated User'}
                   </p>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 shrink-0">
                     <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 font-medium">
+                <p className="text-xs text-slate-500 font-medium truncate">
                   {user?.primaryEmailAddress?.emailAddress || 'No email attached'}
                 </p>
-
-                {/* Google Connected Indicator */}
-                <div className="flex items-center gap-2 mt-1.5">
-                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white border border-slate-200/80 text-[11px] font-semibold text-slate-700 shadow-2xs">
-                    <GoogleIcon className="w-3 h-3" />
-                    <span>
-                      {user?.externalAccounts?.some(acc => acc.provider === 'oauth_google' || acc.verification?.strategy === 'oauth_google') || user?.primaryEmailAddress?.emailAddress?.includes('@gmail.com')
-                        ? 'Google OAuth Connected'
-                        : 'Google Account Supported'}
-                    </span>
-                  </div>
-                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {isGoogleUser ? '🔵 Signed in via Google' : '🔐 Email & Password'}
+                </p>
               </div>
             </div>
 
+            {/* Clerk UserButton — sign-out, profile management */}
             <div className="flex items-center gap-2 self-end sm:self-center">
+              <div className="text-[11px] text-slate-500 text-right hidden sm:block">
+                <p className="font-semibold text-slate-700">Manage Account</p>
+                <p>via Clerk Dashboard</p>
+              </div>
               <UserButton afterSignOutUrl="/" />
             </div>
           </div>
         </SignedIn>
 
+        {/* Signed Out State */}
         <SignedOut>
           <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-sky-50/30 to-blue-50/20 border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="space-y-1">
+            <div className="space-y-1 min-w-0">
               <p className="text-xs font-bold text-slate-900">
-                Sign in with Google to unlock full sync & features
+                Sign in to unlock full features & sync
               </p>
               <p className="text-[11px] text-slate-500 max-w-md">
-                Sync saved agricultural plots, access high-resolution Doppler overlays, and participate in community ground-truth reporting.
+                Sync saved plots, access weather history, community reports, and get personalized alerts.
+                <br />
+                <span className="text-sky-600 font-semibold">Google, GitHub, or Email sign-in available.</span>
               </p>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <GoogleSignInButton className="px-4 py-2 text-xs">
-                Continue with Google
-              </GoogleSignInButton>
-              <SignInButton mode="modal">
-                <button className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
-                  Other Options
-                </button>
-              </SignInButton>
-            </div>
+            <SignInButton mode="modal" afterSignInUrl="/overview" afterSignUpUrl="/overview">
+              <button
+                id="settings-signin-btn"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-2 transition shadow-xs shrink-0"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                Sign In
+              </button>
+            </SignInButton>
           </div>
         </SignedOut>
       </div>
