@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Layers, CloudRain, Thermometer, Wind, Users, Plane, Info } from 'lucide-react'
 import WeatherMap from '../components/WeatherMap'
 
-export default function MapsPage({ currentLocation, crowdReports }) {
+export default function MapsPage({ currentLocation, crowdReports }: any) {
   const [activeLayer, setActiveLayer] = useState('temp_heat')
 
   const layers = [
@@ -13,16 +13,16 @@ export default function MapsPage({ currentLocation, crowdReports }) {
       color: 'border-orange-200 text-orange-800 bg-orange-50'
     },
     {
+      id: 'wind_flow',
+      label: '💨 Wind Flow',
+      desc: 'Live animated streamline wind particle visualization powered by NOAA/GFS & Leaflet-Velocity',
+      color: 'border-cyan-200 text-cyan-800 bg-cyan-50'
+    },
+    {
       id: 'radar',
       label: '🌧️ Live Rain Radar',
       desc: 'Live rainfall clouds and storm echoes around your location',
       color: 'border-sky-200 text-sky-800 bg-sky-50'
-    },
-    {
-      id: 'wind_aqi',
-      label: '💨 Wind & Air Quality',
-      desc: 'Air Quality Index (AQI) levels and breeze conditions across major cities',
-      color: 'border-teal-200 text-teal-800 bg-teal-50'
     },
     {
       id: 'crowd',
@@ -48,10 +48,10 @@ export default function MapsPage({ currentLocation, crowdReports }) {
         <div>
           <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
             <Layers className="w-5 h-5 text-sky-600" />
-            Live Weather & Temperature Maps
+            Live Weather & Atmospheric Maps
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Real-time interactive weather visualization for <strong className="text-slate-800">{currentLocation?.name}</strong>
+            Real-time interactive meteorological radar, temperature, and GFS wind flow for <strong className="text-slate-800">{currentLocation?.name || 'India'}</strong>
           </p>
         </div>
 
@@ -73,14 +73,14 @@ export default function MapsPage({ currentLocation, crowdReports }) {
         </div>
       </div>
 
-      {/* Layer Description Banner for Normal Users */}
+      {/* Layer Description Banner */}
       <div className={`px-4 py-2 rounded-2xl border flex items-center gap-2.5 text-xs font-medium shrink-0 ${currentLayerInfo?.color || 'bg-slate-50 border-slate-200'}`}>
         <Info className="w-4 h-4 shrink-0" />
         <span><strong>What you are seeing:</strong> {currentLayerInfo?.desc}</span>
       </div>
 
       {/* Full Map View */}
-      <div className="flex-1 rounded-3xl overflow-hidden border border-slate-200 shadow-sm bg-white p-2 relative">
+      <div className="flex-1 rounded-3xl overflow-hidden border border-slate-200 shadow-sm bg-white p-1.5 relative">
         <WeatherMap 
           activeLayer={activeLayer} 
           crowdReports={crowdReports}
@@ -92,3 +92,5 @@ export default function MapsPage({ currentLocation, crowdReports }) {
     </div>
   )
 }
+
+

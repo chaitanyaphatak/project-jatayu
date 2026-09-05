@@ -35,6 +35,11 @@ app.add_middleware(
 # Mount API V1
 app.include_router(api_router, prefix="/api/v1")
 
+@app.get("/api/wind-grid")
+async def get_wind_grid_alias():
+    from app.services.weather_service import WeatherService
+    return await WeatherService.get_wind_grid()
+
 @app.get("/")
 def root():
     return {

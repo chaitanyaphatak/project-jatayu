@@ -44,6 +44,15 @@ async def get_weather_forecast(
     data = await WeatherService.get_detailed_forecast(lat, lon, location_name)
     return data
 
+@router.get("/wind-grid")
+async def get_wind_grid():
+    """
+    Provides cached GFS 10m u/v vector wind grid for Leaflet-Velocity animated streamlines.
+    """
+    data = await WeatherService.get_wind_grid()
+    return data
+
+
 @router.get("/saved-locations", response_model=List[Dict[str, Any]])
 async def get_user_saved_locations(user_data: Dict[str, Any] = Depends(verify_clerk_token)):
     """

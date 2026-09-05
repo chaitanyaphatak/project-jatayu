@@ -328,9 +328,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50/25 to-blue-50/20 text-slate-800 flex font-['Plus_Jakarta_Sans',sans-serif]">
+      <div className="h-screen max-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-sky-50/25 to-blue-50/20 text-slate-800 flex font-['Plus_Jakarta_Sans',sans-serif]">
         
-        {/* Persistent Desktop Collapsible Sidebar */}
+        {/* Persistent Desktop Collapsible Sidebar (Fixed in place) */}
         <Sidebar 
           currentLocation={currentLocation}
           trustScore={trustScore}
@@ -347,10 +347,10 @@ export default function App() {
           trustScore={trustScore}
         />
 
-        {/* Main Content View Wrapper */}
-        <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+        {/* Main Content View Wrapper (Dedicated Smooth Scrollable Area) */}
+        <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto overflow-x-hidden">
           
-          {/* Top Header */}
+          {/* Top Header (Pinned Sticky at the Top) */}
           <Header 
             currentLocation={currentLocation}
             onSelectLocation={handleSelectLocation}

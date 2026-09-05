@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { Navigation } from 'lucide-react'
+import { Navigation, Wind, Loader2 } from 'lucide-react'
+import 'leaflet-velocity/dist/leaflet-velocity.css'
+import 'leaflet-velocity/dist/leaflet-velocity.js'
 
 // OpenWeatherMap API key (for real tile layers)
 const OWM_KEY = '0364c7f8d5dfe53b30c3de5642dcc69e'
@@ -121,7 +123,7 @@ function GPSRecenterButton({ center, locationName }: { center: [number, number];
   const map = useMap()
   const handleRecenter = (e: React.MouseEvent) => {
     e.stopPropagation()
-    map.flyTo(center, 10, { duration: 1.2 })
+    map.flyTo(center, 9, { duration: 1.2 })
   }
   return (
     <div className="leaflet-top leaflet-right" style={{ marginTop: '14px', marginRight: '14px', zIndex: 1000, pointerEvents: 'auto' }}>
@@ -132,10 +134,67 @@ function GPSRecenterButton({ center, locationName }: { center: [number, number];
         className="bg-white/95 hover:bg-sky-50 text-slate-700 hover:text-sky-600 px-3 py-2 rounded-2xl shadow-md border border-slate-200/90 flex items-center gap-2 text-xs font-black transition cursor-pointer active:scale-95 group backdrop-blur-sm"
       >
         <Navigation className="w-4 h-4 text-sky-600 group-hover:rotate-45 transition-transform duration-300 fill-sky-100" />
-        <span className="hidden sm:inline">Recenter Location</span>
+        <span className="hidden sm:inline">Recenter {locationName}</span>
       </button>
     </div>
   )
+}
+
+// ── Leaflet-Velocity Custom Component Layer ──
+function VelocityWindLayer({ windData, isMobile }: { windData: any; isMobile: boolean }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!map || !windData || !Array.isArray(windData) || windData.length < 2) return
+
+    let velocityLayer: any = null
+    try {
+      velocityLayer = (L as any).velocityLayer({
+        displayValues: true,
+        displayOptions: {
+          velocityType: 'GFS 10m Wind',
+          position: 'bottomleft',
+          emptyString: 'No wind telemetry',
+          speedUnit: 'm/s',
+          showCardinal: true
+        },
+        data: windData,
+        maxVelocity: 24,
+        minVelocity: 0,
+        velocityScale: 0.0055,
+        particleAge: 65,
+        lineWidth: 2.2,
+        particleMultiplier: isMobile ? 1 / 650 : 1 / 260, // Throttle for mobile
+        frameRate: 24,
+        opacity: 0.95,
+        colorScale: [
+          '#0284c7', // 0-4 m/s (Deep Sky Blue - Calm)
+          '#38bdf8', // 4-8 m/s (Cyan - Light Breeze)
+          '#2dd4bf', // 8-12 m/s (Teal - Moderate Breeze)
+          '#4ade80', // 12-16 m/s (Green - Fresh)
+          '#facc15', // 16-20 m/s (Yellow - Strong)
+          '#fb923c', // 20-24 m/s (Orange - Near Gale)
+          '#ef4444'  // 24+ m/s (Red - Gale / Storm)
+        ]
+      })
+
+      velocityLayer.addTo(map)
+    } catch (err) {
+      console.warn('Leaflet velocityLayer initialization error:', err)
+    }
+
+    return () => {
+      if (velocityLayer && map) {
+        try {
+          map.removeLayer(velocityLayer)
+        } catch (e) {
+          // ignore cleanup
+        }
+      }
+    }
+  }, [map, windData, isMobile])
+
+  return null
 }
 
 // ============================================================
@@ -247,6 +306,147 @@ export default function WeatherMap({
   locationName?: string
 }) {
   const [lat, lon] = centerCoords
+  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false
+
+  // Wind Grid Telemetry State
+  const [windData, setWindData] = useState<any>(null)
+  const [isWindLoading, setIsWindLoading] = useState(false)
+
+  // Fetch cached GFS Wind Grid when Wind Flow layer is selected
+  useEffect(() => {
+    if (activeLayer !== 'wind_flow' || windData) return
+
+    let isMounted = true
+    setIsWindLoading(true)
+
+    const fetchWindGrid = async () => {
+      try {
+        // Try backend API endpoints
+        const endpoints = [
+          'http://localhost:8000/api/v1/weather/wind-grid',
+          'http://localhost:8000/api/wind-grid',
+          '/api/v1/weather/wind-grid',
+          '/api/wind-grid'
+        ]
+
+        let fetched = false
+        for (const ep of endpoints) {
+          try {
+            const res = await fetch(ep)
+            if (res.ok) {
+              const data = await res.json()
+              if (Array.isArray(data) && data.length >= 2 && data[0].header && data[0].data) {
+                if (isMounted) {
+                  setWindData(data)
+                  setIsWindLoading(false)
+                }
+                fetched = true
+                break
+              }
+            }
+          } catch (e) {
+            // try next endpoint
+          }
+        }
+
+        // Fallback: fetch directly from Open-Meteo multi-station API if backend is not reachable
+        if (!fetched && isMounted) {
+          const lats = '28.6,19.0,22.5,13.0,12.9,17.3,23.0,26.9,26.8,25.5,26.1,20.2,21.1,9.9,34.0,11.6,21.0,10.0,19.0,8.0,36.0'
+          const lons = '77.2,72.8,88.3,80.2,77.5,78.4,72.5,75.7,80.9,85.1,91.7,85.8,79.0,76.2,74.7,92.7,67.0,68.0,90.0,86.0,76.0'
+          const omRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=wind_speed_10m,wind_direction_10m`)
+          if (omRes.ok) {
+            const omData = await omRes.json()
+            const items = Array.isArray(omData) ? omData : [omData]
+            const stations = items.map((it: any) => {
+              const spd = (it.current?.wind_speed_10m || 12) / 3.6
+              const dir = (it.current?.wind_direction_10m || 240) * (Math.PI / 180)
+              return {
+                lat: it.latitude,
+                lon: it.longitude,
+                u: -spd * Math.sin(dir),
+                v: -spd * Math.cos(dir)
+              }
+            })
+
+            const la1 = 38.0, la2 = 6.0, lo1 = 66.0, lo2 = 98.0, dx = 1.0, dy = 1.0
+            const nx = Math.round((lo2 - lo1) / dx) + 1
+            const ny = Math.round((la1 - la2) / dy) + 1
+            const uGrid: number[] = []
+            const vGrid: number[] = []
+
+            for (let j = 0; j < ny; j++) {
+              const cLat = la1 - j * dy
+              for (let i = 0; i < nx; i++) {
+                const cLon = lo1 + i * dx
+                let tw = 0, wu = 0, wv = 0
+                for (const s of stations) {
+                  const d2 = (cLat - s.lat) ** 2 + (cLon - s.lon) ** 2 + 0.15
+                  const w = 1 / (d2 ** 1.15)
+                  tw += w
+                  wu += w * s.u
+                  wv += w * s.v
+                }
+                uGrid.push(Number((wu / tw).toFixed(2)))
+                vGrid.push(Number((wv / tw).toFixed(2)))
+              }
+            }
+
+            const fallbackGrid = [
+              {
+                header: {
+                  parameterCategory: 2,
+                  parameterNumber: 2,
+                  numberPoints: uGrid.length,
+                  nx,
+                  ny,
+                  lo1,
+                  la1,
+                  lo2,
+                  la2,
+                  dx,
+                  dy,
+                  refTime: new Date().toISOString(),
+                  parameterNumberName: 'u-component_of_wind',
+                  parameterUnit: 'm.s-1'
+                },
+                data: uGrid
+              },
+              {
+                header: {
+                  parameterCategory: 2,
+                  parameterNumber: 3,
+                  numberPoints: vGrid.length,
+                  nx,
+                  ny,
+                  lo1,
+                  la1,
+                  lo2,
+                  la2,
+                  dx,
+                  dy,
+                  refTime: new Date().toISOString(),
+                  parameterNumberName: 'v-component_of_wind',
+                  parameterUnit: 'm.s-1'
+                },
+                data: vGrid
+              }
+            ]
+            setWindData(fallbackGrid)
+            setIsWindLoading(false)
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load wind grid:', err)
+        if (isMounted) setIsWindLoading(false)
+      }
+    }
+
+    fetchWindGrid()
+
+    return () => {
+      isMounted = false
+    }
+  }, [activeLayer, windData])
 
   const routeWaypoints = [
     { name: 'Pune Airport (VAPO)', coords: [18.5822, 73.9197] as [number, number], risk: 'Low Risk', status: 'Clear Sky', alt: '2,000 ft' },
@@ -265,32 +465,54 @@ export default function WeatherMap({
     { center: [lat + 0.085, lon - 0.065] as [number, number], radius: 11000, color: '#059669', fillColor: '#10b981', fillOpacity: 0.3, intensity: 'Light Drizzle', rate: '2.1 mm/h' }
   ]
 
+  const isDarkBase = activeLayer === 'temp_heat' || activeLayer === 'wind_flow'
+
   return (
-    <div className="w-full h-full min-h-[480px] rounded-2xl overflow-hidden relative z-10 border border-slate-200/80 shadow-sm bg-slate-100">
+    <div className="w-full h-full min-h-[480px] rounded-2xl overflow-hidden relative z-10 border border-slate-200/80 shadow-sm bg-slate-950">
+      
+      {/* Wind Layer Loading Overlay */}
+      {activeLayer === 'wind_flow' && isWindLoading && (
+        <div className="absolute inset-0 z-[1100] bg-slate-950/85 backdrop-blur-xs flex flex-col items-center justify-center text-white">
+          <div className="relative flex items-center justify-center mb-3">
+            <Loader2 className="w-10 h-10 text-cyan-400 animate-spin" />
+            <Wind className="w-4 h-4 text-cyan-300 absolute animate-pulse" />
+          </div>
+          <p className="text-sm font-black tracking-wide text-cyan-300">Initializing Leaflet-Velocity Particles...</p>
+          <p className="text-xs text-slate-400 mt-1">Synthesizing NOAA GFS 10m Vector Grid</p>
+        </div>
+      )}
+
       <MapContainer 
-        center={activeLayer === 'temp_heat' ? [22.5, 80.0] : centerCoords}
-        zoom={activeLayer === 'temp_heat' ? 5 : 9}
+        center={isDarkBase ? [22.5, 80.0] : centerCoords}
+        zoom={isDarkBase ? 5 : 9}
         minZoom={4}
         maxZoom={18}
         scrollWheelZoom={true}
-        style={{ height: '100%', width: '100%', minHeight: '480px', backgroundColor: '#f8fafc' }}
+        style={{ height: '100%', width: '100%', minHeight: '480px', backgroundColor: isDarkBase ? '#090d16' : '#f8fafc' }}
       >
-        {activeLayer === 'temp_heat' 
+        {isDarkBase 
           ? <MapRecenterWide center={centerCoords} />
           : <MapRecenter center={centerCoords} />
         }
         <GPSRecenterButton center={centerCoords} locationName={locationName} />
 
         {/* ────── Base Map ────── */}
-        {/* For temp_heat: use dark/muted base so gradient pops like Windy */}
-        {activeLayer === 'temp_heat' ? (
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
-            minZoom={3}
-            maxZoom={19}
-            opacity={0.85}
-          />
+        {isDarkBase ? (
+          <>
+            <TileLayer
+              attribution='&copy; <a href="https://www.esri.com/">Esri</a>, DeLorme, NAVTEQ'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              minZoom={3}
+              maxZoom={18}
+              opacity={0.95}
+            />
+            <TileLayer
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+              minZoom={3}
+              maxZoom={18}
+              opacity={0.85}
+            />
+          </>
         ) : (
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -300,8 +522,8 @@ export default function WeatherMap({
           />
         )}
 
-        {/* Current location pin (non-temp layers) */}
-        {activeLayer !== 'temp_heat' && (
+        {/* Current location pin (for radar, crowd, and route layers) */}
+        {!isDarkBase && (
           <Marker position={centerCoords}>
             <Popup>
               <div className="p-1.5 space-y-1">
@@ -309,7 +531,7 @@ export default function WeatherMap({
                   📍 You Are Here
                 </span>
                 <p className="font-bold text-slate-900 text-sm mt-1">{locationName}</p>
-                <p className="text-xs text-slate-600">Live Weather Stations Active</p>
+                <p className="text-xs text-slate-600">Live Meteorological Stations Active</p>
               </div>
             </Popup>
           </Marker>
@@ -348,29 +570,27 @@ export default function WeatherMap({
 
         {/* ======================================================== */}
         {/* LAYER 2: 🌡️ WINDY-STYLE FULL INDIA TEMPERATURE MAP     */}
-        {/* OWM continuous gradient tile + 80+ city/village badges   */}
         {/* ======================================================== */}
         {activeLayer === 'temp_heat' && (
           <>
-            {/* ── OpenWeatherMap Official Temperature Tile Layer ──
-                Identical to Windy.com — fills the ENTIRE map canvas
-                with a smooth gradient from purple (cold) → blue → green → yellow → orange → red (hot)
-            */}
-            <TileLayer
-              attribution='Weather tiles by <a href="https://openweathermap.org/">OpenWeatherMap</a>'
-              url={`https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${OWM_KEY}`}
-              minZoom={3}
-              maxZoom={18}
-              opacity={0.88}
-            />
+            {ALL_INDIA_TEMPS.map((place, idx) => {
+              const color = getTempColor(place.temp)
+              const radius = place.type === 'metro' ? 85000 : (place.type === 'city' ? 55000 : 30000)
+              return (
+                <Circle
+                  key={`heat-zone-${idx}`}
+                  center={place.coords}
+                  radius={radius}
+                  pathOptions={{
+                    color: color.bg,
+                    fillColor: color.fill,
+                    fillOpacity: 0.22,
+                    weight: 0
+                  }}
+                />
+              )
+            })}
 
-            {/* ── City / Place name label overlay (CartoDb labels on dark base) ── */}
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png"
-              opacity={0.7}
-            />
-
-            {/* ── Temperature Badge Pins for all 80+ cities + villages ── */}
             {ALL_INDIA_TEMPS.map((place, idx) => (
               <Marker
                 key={idx}
@@ -406,31 +626,10 @@ export default function WeatherMap({
         )}
 
         {/* ======================================================== */}
-        {/* LAYER 3: 💨 WIND & AIR QUALITY (AQI)                   */}
+        {/* LAYER 3: 💨 CUSTOM ANIMATED LEAFLET-VELOCITY WIND FLOW */}
         {/* ======================================================== */}
-        {activeLayer === 'wind_aqi' && (
-          <>
-            {ALL_INDIA_TEMPS.filter(c => c.aqi).map((city, idx) => {
-              const isGood = city.aqi! <= 50
-              const isModerate = city.aqi! > 50 && city.aqi! <= 100
-              const aqiColor = isGood ? '#16a34a' : isModerate ? '#d97706' : '#dc2626'
-              const aqiLabel = isGood ? 'Good' : isModerate ? 'Moderate' : 'Poor'
-              return (
-                <React.Fragment key={idx}>
-                  <Circle center={city.coords} radius={35000} pathOptions={{ color: aqiColor, fillColor: aqiColor, fillOpacity: 0.25, weight: 1.5 }} />
-                  <Marker position={city.coords} icon={createCustomIcon(aqiColor, `AQI ${city.aqi}`)}>
-                    <Popup>
-                      <div className="p-1.5 space-y-1 text-xs">
-                        <p className="font-bold text-slate-900 text-sm">{city.name}</p>
-                        <p className="text-slate-700">Air Quality Index: <strong style={{ color: aqiColor }}>{city.aqi} ({aqiLabel})</strong></p>
-                        <p className="text-slate-500">Breeze: 12-16 km/h from South-West</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                </React.Fragment>
-              )
-            })}
-          </>
+        {activeLayer === 'wind_flow' && windData && (
+          <VelocityWindLayer windData={windData} isMobile={isMobile} />
         )}
 
         {/* ======================================================== */}
@@ -487,8 +686,8 @@ export default function WeatherMap({
 
       </MapContainer>
 
-      {/* ── Interactive Legend Banner ── */}
-      <div className="absolute bottom-3 left-3 z-[1000] bg-black/80 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/10 text-xs text-white flex items-center gap-3 shadow-lg flex-wrap max-w-xl">
+      {/* ── Interactive Legend & Attribution Banner ── */}
+      <div className="absolute bottom-3 left-3 z-[1000] bg-black/85 backdrop-blur-md px-3.5 py-2.5 rounded-2xl border border-white/10 text-xs text-white flex items-center gap-3 shadow-2xl flex-wrap max-w-2xl">
         {activeLayer === 'radar' && (
           <>
             <span className="font-bold text-sky-400">🌧️ Rain Radar:</span>
@@ -508,12 +707,25 @@ export default function WeatherMap({
             <span className="text-slate-400 text-[10px]">OWM + {ALL_INDIA_TEMPS.length} stations</span>
           </>
         )}
-        {activeLayer === 'wind_aqi' && (
+        {activeLayer === 'wind_flow' && (
           <>
-            <span className="font-bold text-white">💨 Air Quality:</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Good (0-50)</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Moderate (51-100)</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Poor (&gt;100)</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-black text-cyan-400 flex items-center gap-1">
+                <Wind className="w-3.5 h-3.5 animate-pulse" />
+                Live Wind Streamlines (GFS 10m):
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#0284c7]"></span> 0-4 m/s (Calm)</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#38bdf8]"></span> 4-8 (Light)</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#2dd4bf]"></span> 8-12 (Mod)</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#4ade80]"></span> 12-16 (Fresh)</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#facc15]"></span> 16-20 (Strong)</span>
+                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]"></span> &gt;20 (Gale)</span>
+              </div>
+            </div>
+            <div className="text-[10px] text-slate-400 pl-2 border-l border-white/20">
+              Wind data: <strong className="text-slate-200">GFS / NOAA</strong> • Rendered with <strong className="text-cyan-300">Leaflet-Velocity</strong>
+            </div>
           </>
         )}
         {activeLayer === 'crowd' && (
