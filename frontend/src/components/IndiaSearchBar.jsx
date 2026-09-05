@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Search, MapPin, Navigation, Sparkles, X, ChevronRight, Loader2, Building, TreePine, Mountain, Waves } from 'lucide-react'
+import { Search, MapPin, Navigation, Sparkles, X, ChevronRight, Loader2 } from 'lucide-react'
 import { INDIA_LOCATIONS, searchIndiaLocations } from '../data/indiaLocations'
 
 export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDetectLocation }) {
@@ -11,7 +11,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
   const dropdownRef = useRef(null)
   const debounceTimerRef = useRef(null)
 
-  // Debounced search-as-you-type with Nominatim Pan-India Village & District Resolver
+  // Universal Pan-India Village, Town & City Geocoder
   useEffect(() => {
     if (!query || query.trim().length === 0) {
       setSuggestions([])
@@ -21,14 +21,11 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
 
     const trimmed = query.trim()
 
-    // First check instant local presets
+    // 1. First check instant local presets
     const localMatches = searchIndiaLocations(trimmed, 6)
-
-    // Set immediate local matches while fetching deep online Nominatim village results
-    if (localMatches.length > 0 && query.length < 3) {
+    if (localMatches.length > 0) {
       setSuggestions(localMatches)
       setIsOpen(true)
-      return
     }
 
     setLoading(true)
@@ -36,70 +33,107 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
 
     debounceTimerRef.current = setTimeout(async () => {
       try {
-        // Query OpenStreetMap Nominatim with India country constraint and detailed address hierarchy
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmed)}&countrycodes=in&addressdetails=1&limit=10`,
-          {
-            headers: {
-              'Accept-Language': 'en,hi'
+        const results = []
+
+        // 2. Open-Meteo High Speed Geocoding (Global + Indian Villages/Towns)
+        try {
+          const omRes = await fetch(
+            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(trimmed)}&count=10&language=en&format=json`
+          )
+          if (omRes.ok) {
+            const omData = await omRes.json()
+            if (omData.results && omData.results.length > 0) {
+              omData.results.forEach((item) => {
+                const admin1 = item.admin1 || ''
+                const admin2 = item.admin2 || ''
+                const country = item.country || 'India'
+                const fullDesc = [admin2, admin1, country].filter(Boolean).join(', ')
+
+                results.push({
+                  name: `${item.name}, ${admin1 || country}`,
+                  displayName: `${item.name}, ${fullDesc}`,
+                  placeName: item.name,
+                  district: admin2 || admin1,
+                  state: admin1 || 'India',
+                  lat: parseFloat(item.latitude),
+                  lon: parseFloat(item.longitude),
+                  type: item.feature_code?.includes('PPL') ? 'Village / Town' : 'City / Settlement',
+                  crop: 'Regional Crops',
+                  risk: 'Live Micro-climate'
+                })
+              })
             }
           }
-        )
-
-        if (res.ok) {
-          const data = await res.json()
-
-          const formattedResults = data.map((item) => {
-            const addr = item.address || {}
-            
-            // Extract hierarchy: village / town / city / suburb / hamlet
-            const placeName = addr.village || addr.town || addr.city || addr.suburb || addr.hamlet || addr.county || item.name || trimmed
-            const district = addr.state_district || addr.district || addr.county || ''
-            const state = addr.state || 'India'
-            const postcode = addr.postcode ? ` - ${addr.postcode}` : ''
-            
-            // Sub-district / Tehsil / Block if available
-            const tehsil = addr.suburb || addr.municipality || ''
-
-            const fullContext = [placeName, tehsil, district, state].filter(Boolean).join(', ')
-
-            return {
-              name: `${placeName}, ${state}`,
-              displayName: fullContext + postcode,
-              placeName: placeName,
-              district: district,
-              state: state,
-              lat: parseFloat(item.lat),
-              lon: parseFloat(item.lon),
-              type: addr.village ? 'Village (Gram Panchayat)' : (addr.town ? 'Town / Tehsil' : (addr.city ? 'City / District' : 'Regional Micro-Sector')),
-              crop: 'Regional Agriculture',
-              risk: 'Atmospheric Micro-climate'
-            }
-          })
-
-          // Combine with relevant local presets
-          const combined = [...localMatches, ...formattedResults]
-          // De-duplicate by lat/lon proximity
-          const unique = []
-          const seen = new Set()
-          for (const item of combined) {
-            const key = `${item.lat.toFixed(2)}_${item.lon.toFixed(2)}`
-            if (!seen.has(key)) {
-              seen.add(key)
-              unique.push(item)
-            }
-          }
-
-          setSuggestions(unique.slice(0, 10))
-          setIsOpen(true)
+        } catch (e) {
+          console.warn('OpenMeteo geocode fallback:', e)
         }
+
+        // 3. Photon OSM Geocoding (Comprehensive Indian Gram Panchayats & Localities)
+        if (results.length < 5) {
+          try {
+            const photonRes = await fetch(
+              `https://photon.komoot.io/api/?q=${encodeURIComponent(trimmed + ' India')}&limit=10`
+            )
+            if (photonRes.ok) {
+              const photonData = await photonRes.json()
+              if (photonData.features && photonData.features.length > 0) {
+                photonData.features.forEach((f) => {
+                  const props = f.properties || {}
+                  const name = props.name || trimmed
+                  const state = props.state || 'Maharashtra'
+                  const district = props.county || props.city || props.district || ''
+                  const coords = f.geometry?.coordinates || []
+                  
+                  if (coords.length >= 2) {
+                    results.push({
+                      name: `${name}, ${state}`,
+                      displayName: [name, district, state, 'India'].filter(Boolean).join(', '),
+                      placeName: name,
+                      district: district,
+                      state: state,
+                      lat: parseFloat(coords[1]),
+                      lon: parseFloat(coords[0]),
+                      type: props.type === 'village' ? 'Village (Gram Panchayat)' : (props.type === 'city' ? 'City' : 'Town / Tehsil'),
+                      crop: 'Regional Agriculture',
+                      risk: 'Active Micro-climate'
+                    })
+                  }
+                })
+              }
+            }
+          } catch (e) {
+            console.warn('Photon geocode fallback:', e)
+          }
+        }
+
+        // Combine with local presets and de-duplicate
+        const combined = [...localMatches, ...results]
+        const unique = []
+        const seen = new Set()
+
+        for (const item of combined) {
+          const key = `${item.name.toLowerCase()}_${item.lat.toFixed(2)}_${item.lon.toFixed(2)}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            unique.push(item)
+          }
+        }
+
+        if (unique.length > 0) {
+          setSuggestions(unique.slice(0, 10))
+        } else if (localMatches.length > 0) {
+          setSuggestions(localMatches)
+        }
+        setIsOpen(true)
       } catch (err) {
-        console.warn('Nominatim village search error:', err)
-        setSuggestions(localMatches)
+        console.warn('Search geocoding error:', err)
+        if (localMatches.length > 0) {
+          setSuggestions(localMatches)
+        }
       } finally {
         setLoading(false)
       }
-    }, 320)
+    }, 250)
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
@@ -117,7 +151,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Reverse geocode live GPS coordinates to exact Indian village/city
+  // Reverse geocode live GPS coordinates
   const handleGPSDetect = () => {
     if (navigator.geolocation) {
       setLoading(true)
@@ -126,25 +160,26 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
           const lat = parseFloat(pos.coords.latitude.toFixed(4))
           const lon = parseFloat(pos.coords.longitude.toFixed(4))
           try {
-            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`)
+            const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}`)
             if (res.ok) {
               const data = await res.json()
-              const addr = data.address || {}
-              const place = addr.village || addr.town || addr.city || addr.suburb || 'Local Area'
-              const state = addr.state || 'India'
-              const district = addr.state_district || addr.district || ''
+              const props = data.features?.[0]?.properties || {}
+              const place = props.name || props.city || props.district || 'My Location'
+              const state = props.state || 'India'
               
               onSelectLocation({
                 name: `${place}, ${state}`,
-                displayName: `${place}, ${district}, ${state}`,
+                displayName: `${place}, ${props.county || ''}, ${state}`,
                 state: state,
                 lat: lat,
                 lon: lon,
-                type: 'Live GPS Ground Station',
-                crop: 'Local Agriculture',
+                type: 'Live GPS Location',
+                crop: 'Regional Agriculture',
                 risk: 'Active Micro-climate'
               })
               setIsOpen(false)
+            } else {
+              onDetectLocation()
             }
           } catch (e) {
             onDetectLocation()
@@ -152,7 +187,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
             setLoading(false)
           }
         },
-        (err) => {
+        () => {
           setLoading(false)
           alert('GPS location permission denied. Please search your village or city in the search bar.')
         }
@@ -177,7 +212,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
           value={query}
           onFocus={() => setIsOpen(true)}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search any Indian village, tehsil, city, or pincode..."
+          placeholder="Search any village, tehsil, city (e.g. Bhugaon, Pune, Jaipur)..."
           className="w-full bg-transparent outline-none text-xs md:text-sm text-slate-800 placeholder-slate-400 font-medium py-1"
         />
 
@@ -185,6 +220,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
           <Loader2 className="w-4 h-4 text-sky-600 animate-spin shrink-0" />
         ) : query ? (
           <button 
+            type="button"
             onClick={() => { setQuery(''); setSuggestions([]) }}
             className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200 transition"
           >
@@ -193,9 +229,10 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
         ) : null}
 
         <button
+          type="button"
           onClick={handleGPSDetect}
           title="Detect Exact Village/City GPS"
-          className="px-2 py-1 rounded-xl bg-white hover:bg-sky-50 text-sky-700 text-xs font-bold flex items-center gap-1 border border-slate-200 hover:border-sky-300 transition shrink-0 shadow-xs"
+          className="px-2 py-1 rounded-xl bg-white hover:bg-sky-50 text-sky-700 text-xs font-bold flex items-center gap-1 border border-slate-200 hover:border-sky-300 transition shrink-0 shadow-xs cursor-pointer"
         >
           <Navigation className="w-3 h-3 text-sky-600" />
           <span className="hidden sm:inline">GPS</span>
@@ -206,22 +243,23 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-900/10 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[420px] flex flex-col">
           
-          {/* Category Chips Bar */}
+          {/* Category Quick Filter Chips */}
           <div className="p-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] font-bold">
             <span className="text-slate-400 uppercase tracking-wider text-[10px] mr-1 shrink-0">
-              Quick Filter:
+              Popular:
             </span>
             {[
               { id: 'All', label: 'All India' },
+              { id: 'Agri-Hub', label: '🌾 Rural & Agri' },
               { id: 'Metro', label: 'Metros' },
-              { id: 'Agri-Hub', label: '🌾 Agri Hubs' },
-              { id: 'Hill Station', label: '🏔️ Himalayas' },
-              { id: 'Coastal', label: '🌊 Coastal Ports' }
+              { id: 'Hill Station', label: '🏔️ Hill Stations' },
+              { id: 'Coastal', label: '🌊 Coastal' }
             ].map((cat) => (
               <button
                 key={cat.id}
+                type="button"
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition ${
+                className={`px-2.5 py-1 rounded-full whitespace-nowrap transition cursor-pointer ${
                   selectedCategory === cat.id 
                     ? 'bg-sky-600 text-white shadow-xs' 
                     : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
@@ -238,12 +276,13 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
               suggestions.map((loc, idx) => (
                 <button
                   key={idx}
+                  type="button"
                   onClick={() => {
                     onSelectLocation(loc)
                     setQuery('')
                     setIsOpen(false)
                   }}
-                  className="w-full text-left p-2.5 rounded-xl hover:bg-sky-50/80 transition flex items-center justify-between group"
+                  className="w-full text-left p-2.5 rounded-xl hover:bg-sky-50/80 transition flex items-center justify-between group cursor-pointer"
                 >
                   <div className="flex items-start gap-2.5">
                     <div className="p-1.5 bg-sky-100 text-sky-700 rounded-lg group-hover:bg-sky-200 transition mt-0.5 shrink-0">
@@ -258,7 +297,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
                       </p>
                       {loc.crop && (
                         <p className="text-[10px] text-emerald-700 font-semibold">
-                          🌾 Primary Crop: {loc.crop}
+                          🌾 Dominant Crop: {loc.crop}
                         </p>
                       )}
                     </div>
@@ -271,21 +310,22 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
             ) : query.trim().length > 0 && !loading ? (
               <div className="p-6 text-center space-y-2">
                 <p className="text-xs text-slate-600">
-                  No direct village match for <strong>"{query}"</strong>
+                  Searching live database for <strong>"{query}"</strong>...
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  Try typing the district or state name (e.g. "{query}, Satara" or "{query}, Uttar Pradesh").
+                  Try entering village or tehsil name with state (e.g. "{query}, Maharashtra").
                 </p>
               </div>
             ) : (
               getFilteredPresets().map((loc, idx) => (
                 <button
                   key={idx}
+                  type="button"
                   onClick={() => {
                     onSelectLocation(loc)
                     setIsOpen(false)
                   }}
-                  className="w-full text-left p-2.5 rounded-xl hover:bg-slate-50 transition flex items-center justify-between group"
+                  className="w-full text-left p-2.5 rounded-xl hover:bg-slate-50 transition flex items-center justify-between group cursor-pointer"
                 >
                   <div className="flex items-start gap-2.5">
                     <MapPin className="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-600 transition mt-0.5 shrink-0" />
@@ -308,7 +348,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
 
           {/* Footer Info */}
           <div className="p-2 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-400 text-center font-medium">
-            OpenStreetMap Nominatim village geocoder & 100+ Indian meteorological stations active
+            Pan-India High-Resolution Village & City Geocoding Active
           </div>
         </div>
       )}

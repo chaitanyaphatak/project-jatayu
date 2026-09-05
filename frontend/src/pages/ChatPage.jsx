@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { 
-  Sparkles, Send, Volume2, VolumeX, ShieldCheck, 
+  Sparkles, ArrowUp, Volume2, VolumeX, ShieldCheck, 
   MapPin, Sprout, Plane, Flame, Building2, Mic, MicOff,
-  Bot, Copy, Check, Radio
+  Bot, Copy, Check, Radio, StopCircle
 } from 'lucide-react'
 
 export default function ChatPage({ currentLocation, weather, userRole, cropStage, user, isSignedIn, getToken }) {
@@ -11,6 +11,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
   const [isListening, setIsListening] = useState(false)
   const [activeSpeechId, setActiveSpeechId] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
+  const [isHoveredSend, setIsHoveredSend] = useState(false)
   
   const recognitionRef = useRef(null)
   const isListeningRef = useRef(false)
@@ -37,7 +38,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
     `What is the current air quality and humidity?`
   ]
 
-  // Setup Continuous Web Speech Recognition (like ChatGPT / Gemini)
+  // Setup Continuous Web Speech Recognition (ChatGPT / Gemini style)
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (SpeechRecognition) {
@@ -69,7 +70,6 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
       }
 
       recog.onend = () => {
-        // Auto-restart if user has not explicitly stopped (like ChatGPT continuous mode)
         if (isListeningRef.current) {
           try {
             recog.start()
@@ -195,7 +195,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
     }
   }
 
-  // Text-to-Speech playback (like ChatGPT Read Aloud)
+  // Text-to-Speech playback (ChatGPT-style Read Aloud)
   const handleSpeakText = (messageId, text) => {
     if (activeSpeechId === messageId) {
       if ('speechSynthesis' in window) {
@@ -207,7 +207,6 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
 
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
-      // Clean markdown formatting characters for fluid natural speech
       const cleanText = text.replace(/[*_#•`]/g, '').trim()
       const utterance = new SpeechSynthesisUtterance(cleanText)
       utterance.rate = 0.95
@@ -280,7 +279,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
                 <div className="mt-3.5 pt-2.5 border-t border-slate-200/80 flex items-center justify-between flex-wrap gap-2 text-xs text-slate-500">
                   <div className="flex items-center gap-2">
                     
-                    {/* Read Aloud Button (Bottom placed like ChatGPT) */}
+                    {/* Read Aloud Button (Bottom placed) */}
                     <button
                       type="button"
                       onClick={() => handleSpeakText(m.id, m.text)}
@@ -369,34 +368,17 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
         ))}
       </div>
 
-      {/* Live Voice Recording Status Banner when listening */}
-      {isListening && (
-        <div className="bg-rose-50 border-t border-rose-200 px-4 py-2 flex items-center justify-between text-xs text-rose-800 font-semibold animate-pulse shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping"></span>
-            <span>🎙️ Listening continuously... Speak naturally in English or Hindi (Tap mic to finish)</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleToggleListening}
-            className="px-2 py-0.5 rounded bg-rose-600 text-white text-[10px] font-bold uppercase hover:bg-rose-700 transition"
-          >
-            Done
-          </button>
-        </div>
-      )}
-
-      {/* Input Box with Continuous Mic + Send */}
-      <form onSubmit={handleSendMessage} className="p-3.5 border-t border-slate-100 bg-white flex items-center gap-2 shrink-0">
+      {/* Input Box with Claude-style Animated Send Button */}
+      <form onSubmit={handleSendMessage} className="p-3.5 border-t border-slate-100 bg-white flex items-center gap-2.5 shrink-0">
         
         {/* Continuous Voice Input Mic Button */}
         <button
           type="button"
           onClick={handleToggleListening}
-          title={isListening ? "Listening... click to stop recording" : "Click to speak with voice (Continuous Voice Input)"}
-          className={`p-3 rounded-2xl transition flex items-center justify-center shrink-0 shadow-xs cursor-pointer ${
+          title={isListening ? "Listening... Tap to finish" : "Click to speak with voice"}
+          className={`p-3 rounded-2xl transition-all duration-200 flex items-center justify-center shrink-0 cursor-pointer ${
             isListening 
-              ? 'bg-rose-600 text-white animate-pulse ring-4 ring-rose-100 scale-105' 
+              ? 'bg-rose-600 text-white animate-pulse ring-4 ring-rose-200 scale-105 shadow-md' 
               : 'bg-slate-100 text-slate-600 hover:text-sky-600 hover:bg-sky-50'
           }`}
         >
@@ -404,23 +386,34 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
         </button>
 
         {/* Text Input Field */}
-        <div className="flex-1 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2 focus-within:border-sky-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-sky-100 transition">
+        <div className="flex-1 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 focus-within:border-sky-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-sky-100 transition shadow-2xs">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={isListening ? "🎙️ Transcribing your speech..." : `Ask Vayu anything about weather in ${currentLocation?.name?.split(',')[0]}...`}
-            className="w-full bg-transparent outline-none text-xs md:text-sm text-slate-800 placeholder-slate-400"
+            placeholder={isListening ? "🎙️ Listening... speak naturally in Hindi or English" : `Ask Vayu anything about weather in ${currentLocation?.name?.split(',')[0]}...`}
+            className="w-full bg-transparent outline-none text-xs md:text-sm text-slate-800 placeholder-slate-400 font-medium"
           />
         </div>
 
-        {/* Send Button */}
+        {/* Claude-style Animated Send Button with spring hover & active morph */}
         <button
           type="submit"
           disabled={isThinking || !query.trim()}
-          className="p-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 disabled:opacity-50 text-white rounded-2xl shadow-md shadow-sky-500/20 transition shrink-0 cursor-pointer"
+          onMouseEnter={() => setIsHoveredSend(true)}
+          onMouseLeave={() => setIsHoveredSend(false)}
+          className={`relative p-3 rounded-2xl transition-all duration-300 flex items-center justify-center shrink-0 cursor-pointer ${
+            query.trim() && !isThinking
+              ? 'bg-slate-900 hover:bg-sky-600 text-white shadow-md shadow-slate-900/10 hover:shadow-sky-500/25 hover:scale-105 active:scale-95'
+              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+          }`}
+          title="Send message"
         >
-          <Send className="w-4 h-4" />
+          {isThinking ? (
+            <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            <ArrowUp className={`w-4 h-4 transition-transform duration-200 ${isHoveredSend && query.trim() ? '-translate-y-0.5' : ''}`} />
+          )}
         </button>
       </form>
     </div>
