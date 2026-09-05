@@ -324,7 +324,18 @@ export default function ChatPage({
     }
   }
 
-  // Text-to-Speech playback with symbol cleaning
+  const langDisplayNames: Record<string, string> = {
+    en: 'English (Indian)',
+    hi: 'Hindi (हिन्दी)',
+    mr: 'Marathi (मराठी)',
+    pa: 'Punjabi (ਪੰਜਾਬੀ)',
+    gu: 'Gujarati (ગુજરાતી)',
+    bn: 'Bengali (বাংলা)',
+    te: 'Telugu (తెలుగు)',
+    ta: 'Tamil (தமிழ்)'
+  }
+
+  // Text-to-Speech playback with symbol cleaning and dialect voice detection
   const handleSpeakText = (messageId: number, text: string) => {
     if (activeSpeechId === messageId) {
       if ('speechSynthesis' in window) {
@@ -337,8 +348,9 @@ export default function ChatPage({
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
 
-      // Clean all symbols for natural speech
+      // Clean all symbols, emojis, and markdown characters for clear natural pronunciation
       let cleanText = text
+        .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '') // Remove emojis
         .replace(/https?:\/\/\S+/gi, '')
         .replace(/[*_#`~|•▪▫–—\\]/g, ' ')
         .replace(/\b°C\b|\b°c\b/gi, ' degrees Celsius ')
@@ -352,9 +364,21 @@ export default function ChatPage({
         .trim()
 
       const utterance = new SpeechSynthesisUtterance(cleanText)
-      utterance.lang = language === 'hi' ? 'hi-IN' : (language === 'mr' ? 'mr-IN' : 'en-IN')
+      const langCode = language === 'hi' ? 'hi-IN' : (language === 'mr' ? 'mr-IN' : (language === 'pa' ? 'pa-IN' : (language === 'gu' ? 'gu-IN' : (language === 'bn' ? 'bn-IN' : (language === 'ta' ? 'ta-IN' : (language === 'te' ? 'te-IN' : 'en-IN'))))))
+      utterance.lang = langCode
       utterance.rate = 0.95
       utterance.pitch = 1.0
+
+      // Match native voice installed in client OS (Windows / Android / iOS / Chrome)
+      const voices = window.speechSynthesis.getVoices()
+      const targetPrefix = language === 'hi' ? 'hi' : (language === 'mr' ? 'mr' : 'en')
+      const matchedVoice = voices.find(v => 
+        v.lang.toLowerCase().startsWith(targetPrefix) || 
+        v.lang.toLowerCase().replace('_', '-').startsWith(targetPrefix)
+      )
+      if (matchedVoice) {
+        utterance.voice = matchedVoice
+      }
 
       utterance.onend = () => setActiveSpeechId(null)
       utterance.onerror = () => setActiveSpeechId(null)
@@ -444,7 +468,7 @@ export default function ChatPage({
 
         {/* Sidebar Bottom Footer */}
         <div className="p-3 border-t border-slate-200/80 bg-white text-[11px] text-slate-500 font-medium flex items-center justify-between">
-          <span>Language: <strong className="text-slate-700 uppercase">{language}</strong></span>
+          <span>🌐 <strong className="text-slate-700">{langDisplayNames[language] || language.toUpperCase()}</strong></span>
           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Saved</span>
         </div>
       </aside>

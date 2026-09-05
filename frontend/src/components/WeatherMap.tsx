@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
+import { Navigation } from 'lucide-react'
 
 // Fix default leaflet marker icon in react
-delete L.Icon.Default.prototype._getIconUrl
+delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -11,7 +12,7 @@ L.Icon.Default.mergeOptions({
 })
 
 // Custom cluster / badge icons
-const createCustomIcon = (color, label, bgColor = '#ffffff', textColor = '#ffffff') => {
+const createCustomIcon = (color: string, label: string, bgColor = '#ffffff', textColor = '#ffffff') => {
   return L.divIcon({
     className: 'custom-div-icon',
     html: `<div style="background: ${color}; min-width: 32px; height: 32px; padding: 0 6px; border-radius: 16px; display: flex; align-items: center; justify-content: center; color: ${textColor}; font-weight: 800; font-size: 11px; border: 2.5px solid ${bgColor}; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); white-space: nowrap;">${label}</div>`,
@@ -21,7 +22,7 @@ const createCustomIcon = (color, label, bgColor = '#ffffff', textColor = '#fffff
 }
 
 // Temperature color mapper for intuitive normal user understanding
-const getTempColor = (temp) => {
+const getTempColor = (temp: number) => {
   if (temp >= 38) return { bg: '#dc2626', fill: '#ef4444', label: 'Very Hot (>38°C)' }
   if (temp >= 33) return { bg: '#ea580c', fill: '#f97316', label: 'Hot (33-37°C)' }
   if (temp >= 28) return { bg: '#d97706', fill: '#f59e0b', label: 'Warm (28-32°C)' }
@@ -31,7 +32,7 @@ const getTempColor = (temp) => {
 }
 
 // Controller component to smoothly pan/zoom map when selected location changes
-function MapRecenter({ center }) {
+function MapRecenter({ center }: { center: [number, number] }) {
   const map = useMap()
   useEffect(() => {
     if (center && center.length === 2) {
@@ -39,6 +40,29 @@ function MapRecenter({ center }) {
     }
   }, [center, map])
   return null
+}
+
+// Floating GPS / Snap-back to Location Button
+function GPSRecenterButton({ center, locationName }: { center: [number, number]; locationName: string }) {
+  const map = useMap()
+  const handleRecenter = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    map.flyTo(center, 10, { duration: 1.2 })
+  }
+
+  return (
+    <div className="leaflet-top leaflet-right" style={{ marginTop: '14px', marginRight: '14px', zIndex: 1000, pointerEvents: 'auto' }}>
+      <button
+        type="button"
+        onClick={handleRecenter}
+        title={`Recenter map to ${locationName}`}
+        className="bg-white/95 hover:bg-sky-50 text-slate-700 hover:text-sky-600 px-3 py-2 rounded-2xl shadow-md border border-slate-200/90 flex items-center gap-2 text-xs font-black transition cursor-pointer active:scale-95 group backdrop-blur-sm"
+      >
+        <Navigation className="w-4 h-4 text-sky-600 group-hover:rotate-45 transition-transform duration-300 fill-sky-100" />
+        <span className="hidden sm:inline">Recenter Location</span>
+      </button>
+    </div>
+  )
 }
 
 export default function WeatherMap({ 
@@ -120,6 +144,7 @@ export default function WeatherMap({
         style={{ height: '100%', width: '100%', minHeight: '480px', backgroundColor: '#f8fafc' }}
       >
         <MapRecenter center={centerCoords} />
+        <GPSRecenterButton center={centerCoords} locationName={locationName} />
 
         {/* Clean Free OpenStreetMap Base Map */}
         <TileLayer
