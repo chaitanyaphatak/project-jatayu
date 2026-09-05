@@ -2,7 +2,7 @@ import React from 'react'
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
 import { 
   AlertTriangle, Sprout, Plane, Flame, Building2, 
-  PlusCircle, LogIn, Award, Menu
+  PlusCircle, LogIn, Award, Menu, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react'
 import IndiaSearchBar from './IndiaSearchBar'
 
@@ -15,7 +15,9 @@ export default function Header({
   setUserRole,
   onOpenReportModal,
   trustScore,
-  onToggleMobileMenu
+  onToggleMobileMenu,
+  isSidebarCollapsed,
+  onToggleSidebar
 }) {
   return (
     <header className="border-b border-slate-200/90 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-xs">
@@ -39,17 +41,36 @@ export default function Header({
       {/* Main Header Bar */}
       <div className="px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap lg:flex-nowrap">
         
-        {/* Mobile Menu Button + Location on Mobile */}
-        <div className="flex items-center gap-2 lg:hidden">
+        {/* Left Side: Desktop Sidebar Toggle & Mobile Menu Trigger */}
+        <div className="flex items-center gap-2">
+          {/* Desktop Toggle Button */}
           <button
-            onClick={onToggleMobileMenu}
-            className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
+            type="button"
+            onClick={onToggleSidebar}
+            title={isSidebarCollapsed ? "Expand sidebar navigation" : "Collapse sidebar navigation"}
+            aria-label="Toggle navigation sidebar"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition hidden lg:flex items-center justify-center shrink-0 border border-slate-200/80 shadow-2xs"
           >
-            <Menu className="w-5 h-5" />
+            {isSidebarCollapsed ? (
+              <PanelLeftOpen className="w-4 h-4 text-sky-600" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4 text-slate-600" />
+            )}
           </button>
-          <span className="font-bold text-slate-800 text-xs truncate max-w-[140px]">
-            {currentLocation?.name?.split(',')[0]}
-          </span>
+
+          {/* Mobile Menu Button + Location Pill */}
+          <div className="flex items-center gap-2 lg:hidden">
+            <button
+              onClick={onToggleMobileMenu}
+              aria-label="Open mobile menu"
+              className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="font-bold text-slate-800 text-xs truncate max-w-[140px]">
+              {currentLocation?.name?.split(',')[0]}
+            </span>
+          </div>
         </div>
 
         {/* Pan-India Search Bar (Full India Village & City Resolver) */}

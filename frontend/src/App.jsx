@@ -43,6 +43,37 @@ export default function App() {
   // Modals & Mobile Drawer State
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  
+  // Desktop Collapsible Sidebar State with localStorage persistence
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('weathergpt_sidebar_collapsed') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem('weathergpt_sidebar_collapsed', String(next))
+      } catch {}
+      return next
+    })
+  }
+
+  // Keyboard shortcut Ctrl+B / Cmd+B to toggle sidebar navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        toggleSidebar()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   // Crowd Reports & Leaderboard State
   const [crowdReports, setCrowdReports] = useState([])
@@ -235,21 +266,25 @@ export default function App() {
     <BrowserRouter>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50/25 to-blue-50/20 text-slate-800 flex font-['Plus_Jakarta_Sans',sans-serif]">
         
-        {/* Persistent Desktop Sidebar */}
+        {/* Persistent Desktop Collapsible Sidebar */}
         <Sidebar 
           currentLocation={currentLocation}
           trustScore={trustScore}
           userRole={userRole}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
         />
 
         {/* Mobile Navigation Drawer */}
         <MobileNav 
           isOpen={isMobileMenuOpen}
           onClose={() => setIsMobileMenuOpen(false)}
+          currentLocation={currentLocation}
+          trustScore={trustScore}
         />
 
         {/* Main Content View Wrapper */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+        <div className="flex-1 flex flex-col min-w-0 min-h-screen">
           
           {/* Top Header */}
           <Header 
@@ -262,6 +297,8 @@ export default function App() {
             onOpenReportModal={() => setIsReportModalOpen(true)}
             trustScore={trustScore}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebar={toggleSidebar}
           />
 
           {/* Page Routing Views */}
