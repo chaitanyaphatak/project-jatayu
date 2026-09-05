@@ -78,3 +78,31 @@
 .leaflet-popup-tip {
   background: #ffffff !important;
 }
+
+/* Hide Clerk Watermarks and "Secured by Clerk" */
+.cl-footerAction,
+.cl-userButtonPopoverFooter,
+.cl-internal-b3fm6y,
+.cl-internal-1dauvpw,
+.cl-internal-1j7fl91,
+.cl-footer,
+.cl-branded,
+.cl-userButtonPopoverRoot .cl-footerAction {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+}
+
+/* Compact Clerk Modals and Popovers without wide blank space */
+.cl-userButtonPopoverCard {
+  max-width: 320px !important;
+  width: auto !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 20px !important;
+  border: 1px solid #e2e8f0 !important;
+  overflow: hidden !important;
+}
+
+.cl-userButtonPopoverMain {
+  padding: 8px !important;
+}

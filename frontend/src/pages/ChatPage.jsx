@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { 
   Sparkles, Send, Volume2, VolumeX, ShieldCheck, 
   MapPin, Sprout, Plane, Flame, Building2, Mic, MicOff,
-  Bot, RefreshCw, Radio
+  Bot, Copy, Check, Radio
 } from 'lucide-react'
 
 export default function ChatPage({ currentLocation, weather, userRole, cropStage, user, isSignedIn, getToken }) {
@@ -10,9 +10,11 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
   const [isThinking, setIsThinking] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [activeSpeechId, setActiveSpeechId] = useState(null)
+  const [copiedId, setCopiedId] = useState(null)
   
   const recognitionRef = useRef(null)
-  const audioPlayerRef = useRef(null)
+  const isListeningRef = useRef(false)
+  const baseTranscriptRef = useRef('')
 
   const [messages, setMessages] = useState([
     {
@@ -35,30 +37,49 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
     `What is the current air quality and humidity?`
   ]
 
-  // Setup Web Speech Recognition
+  // Setup Continuous Web Speech Recognition (like ChatGPT / Gemini)
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (SpeechRecognition) {
       const recog = new SpeechRecognition()
-      recog.continuous = false
-      recog.interimResults = false
-      recog.lang = 'en-IN' // Supports Indian English and Hindi mixed
+      recog.continuous = true
+      recog.interimResults = true
+      recog.lang = 'en-IN'
 
       recog.onresult = (event) => {
-        const transcript = event.results[0][0].transcript
-        if (transcript) {
-          setQuery(transcript)
+        let finalTranscript = ''
+        let interimTranscript = ''
+
+        for (let i = 0; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript + ' '
+          } else {
+            interimTranscript += event.results[i][0].transcript
+          }
         }
-        setIsListening(false)
+
+        const combined = (baseTranscriptRef.current + ' ' + finalTranscript + interimTranscript).trim()
+        setQuery(combined)
       }
 
       recog.onerror = (event) => {
-        console.warn('Speech recognition error:', event.error)
-        setIsListening(false)
+        if (event.error !== 'no-speech') {
+          console.warn('Speech recognition warning:', event.error)
+        }
       }
 
       recog.onend = () => {
-        setIsListening(false)
+        // Auto-restart if user has not explicitly stopped (like ChatGPT continuous mode)
+        if (isListeningRef.current) {
+          try {
+            recog.start()
+          } catch {
+            setIsListening(false)
+            isListeningRef.current = false
+          }
+        } else {
+          setIsListening(false)
+        }
       }
 
       recognitionRef.current = recog
@@ -74,22 +95,28 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
     }
   }, [])
 
-  // Toggle Voice Input (Mic)
+  // Toggle Continuous Voice Input (Mic)
   const handleToggleListening = () => {
     if (!recognitionRef.current) {
-      alert('Voice recognition is not supported in this browser. Please use Chrome, Edge, or Safari.')
+      alert('Voice recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge.')
       return
     }
 
     if (isListening) {
-      recognitionRef.current.stop()
+      isListeningRef.current = false
       setIsListening(false)
+      try {
+        recognitionRef.current.stop()
+      } catch {}
     } else {
       try {
+        baseTranscriptRef.current = query.trim()
+        isListeningRef.current = true
         setIsListening(true)
         recognitionRef.current.start()
       } catch (err) {
         console.warn('Mic start error:', err)
+        isListeningRef.current = false
         setIsListening(false)
       }
     }
@@ -100,10 +127,20 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
     e?.preventDefault()
     if (!query.trim() || isThinking) return
 
+    // Stop listening if mic was active
+    if (isListening) {
+      isListeningRef.current = false
+      setIsListening(false)
+      try {
+        recognitionRef.current?.stop()
+      } catch {}
+    }
+
     const userMsg = { id: Date.now(), sender: 'user', text: query }
     setMessages(prev => [...prev, userMsg])
     const currentQuery = query
     setQuery('')
+    baseTranscriptRef.current = ''
     setIsThinking(true)
 
     try {
@@ -158,7 +195,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
     }
   }
 
-  // Text-to-Speech playback (Web Speech API + Backend fallback)
+  // Text-to-Speech playback (like ChatGPT Read Aloud)
   const handleSpeakText = (messageId, text) => {
     if (activeSpeechId === messageId) {
       if ('speechSynthesis' in window) {
@@ -170,8 +207,8 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
 
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
-      // Clean markdown tags for natural speech
-      const cleanText = text.replace(/[*_#•]/g, '').trim()
+      // Clean markdown formatting characters for fluid natural speech
+      const cleanText = text.replace(/[*_#•`]/g, '').trim()
       const utterance = new SpeechSynthesisUtterance(cleanText)
       utterance.rate = 0.95
       utterance.pitch = 1.0
@@ -184,9 +221,15 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
     }
   }
 
+  // Copy text helper
+  const handleCopyText = (messageId, text) => {
+    navigator.clipboard.writeText(text)
+    setCopiedId(messageId)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
   return (
     <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-140px)] min-h-[600px] animate-in fade-in duration-200">
-      <audio ref={audioPlayerRef} className="hidden" />
 
       {/* Chat Header: Unique VAYU AI Persona */}
       <div className="border-b border-slate-100 p-4 bg-gradient-to-r from-sky-50/80 via-white to-blue-50/50 flex items-center justify-between flex-wrap gap-2 shrink-0">
@@ -204,7 +247,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
               </span>
             </div>
             <span className="text-xs text-slate-500 font-medium">
-              Live updates & agricultural advice for {currentLocation?.name?.split(',')[0]}
+              Real-time weather insights & farming guide for {currentLocation?.name?.split(',')[0]}
             </span>
           </div>
         </div>
@@ -216,58 +259,89 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
       </div>
 
       {/* Messages Feed */}
-      <div className="flex-1 p-5 overflow-y-auto space-y-4">
+      <div className="flex-1 p-5 overflow-y-auto space-y-5">
         {messages.map((m) => (
           <div 
             key={m.id} 
             className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
           >
             <div 
-              className={`max-w-[85%] rounded-3xl px-4 py-3.5 text-sm leading-relaxed ${
+              className={`max-w-[85%] rounded-3xl px-5 py-4 text-sm leading-relaxed ${
                 m.sender === 'user' 
                   ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-br-xs shadow-md shadow-sky-500/15' 
-                  : 'bg-slate-50 border border-slate-200 text-slate-800 rounded-bl-xs shadow-xs'
+                  : 'bg-slate-50 border border-slate-200/90 text-slate-800 rounded-bl-xs shadow-xs'
               }`}
             >
-              <div className="flex items-start justify-between gap-3">
-                <p className="whitespace-pre-line flex-1 font-normal">{m.text}</p>
-                
-                {/* Voice Readout Button */}
-                {m.sender === 'assistant' && (
-                  <button
-                    onClick={() => handleSpeakText(m.id, m.text)}
-                    className={`p-1.5 rounded-xl transition shrink-0 ${
-                      activeSpeechId === m.id 
-                        ? 'bg-rose-100 text-rose-600' 
-                        : 'hover:bg-slate-200 text-slate-500 hover:text-sky-700'
-                    }`}
-                    title={activeSpeechId === m.id ? 'Stop reading' : 'Read aloud'}
-                  >
-                    {activeSpeechId === m.id ? (
-                      <VolumeX className="w-4 h-4 text-rose-600 animate-pulse" />
-                    ) : (
-                      <Volume2 className="w-4 h-4" />
-                    )}
-                  </button>
-                )}
-              </div>
+              {/* Message Content */}
+              <p className="whitespace-pre-line font-normal">{m.text}</p>
 
-              {m.explain && (
-                <div className="mt-3 pt-2.5 border-t border-slate-200/80 text-[11px] text-slate-600 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="flex items-center gap-1 text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    <ShieldCheck className="w-3 h-3" /> Accuracy: {m.explain.confidence}%
-                  </span>
-                  <span className="text-slate-500 font-medium">Source: {m.explain.models}</span>
+              {/* ChatGPT-style Bottom Action Toolbar for AI Responses */}
+              {m.sender === 'assistant' && (
+                <div className="mt-3.5 pt-2.5 border-t border-slate-200/80 flex items-center justify-between flex-wrap gap-2 text-xs text-slate-500">
+                  <div className="flex items-center gap-2">
+                    
+                    {/* Read Aloud Button (Bottom placed like ChatGPT) */}
+                    <button
+                      type="button"
+                      onClick={() => handleSpeakText(m.id, m.text)}
+                      className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-semibold transition cursor-pointer ${
+                        activeSpeechId === m.id 
+                          ? 'bg-rose-100 text-rose-700 font-bold' 
+                          : 'bg-white hover:bg-slate-200/80 text-slate-700 border border-slate-200/80'
+                      }`}
+                      title={activeSpeechId === m.id ? 'Stop listening' : 'Read aloud response'}
+                    >
+                      {activeSpeechId === m.id ? (
+                        <>
+                          <VolumeX className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+                          <span>Stop Audio</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5 text-sky-600" />
+                          <span>Read Aloud</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Copy Response Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(m.id, m.text)}
+                      className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-200/80 text-slate-700 border border-slate-200/80 flex items-center gap-1.5 font-semibold transition cursor-pointer"
+                      title="Copy text"
+                    >
+                      {copiedId === m.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700 font-bold">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Confidence Accuracy Tag */}
+                  {m.explain && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600" /> {m.explain.confidence}% Accuracy
+                    </span>
+                  )}
                 </div>
               )}
             </div>
+            
             <span className="text-[10px] text-slate-400 mt-1 px-1 font-medium">
               {m.sender === 'user' ? (user?.firstName || 'You') : 'Vayu AI'}
             </span>
           </div>
         ))}
 
-        {/* Polished & Friendly Thinking State */}
+        {/* Polished Thinking Animation */}
         {isThinking && (
           <div className="flex flex-col items-start animate-fade-in">
             <div className="bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-3xl rounded-bl-xs px-4 py-3 text-xs text-sky-800 font-semibold flex items-center gap-2.5 shadow-sm">
@@ -286,25 +360,43 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
         {samplePrompts.map((p, idx) => (
           <button
             key={idx}
+            type="button"
             onClick={() => setQuery(p)}
-            className="whitespace-nowrap px-3 py-1.5 rounded-full bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 hover:border-sky-200 shadow-xs transition text-xs font-semibold"
+            className="whitespace-nowrap px-3 py-1.5 rounded-full bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 hover:border-sky-200 shadow-xs transition text-xs font-semibold cursor-pointer"
           >
             {p}
           </button>
         ))}
       </div>
 
-      {/* Input Box with Voice Mic + Send */}
+      {/* Live Voice Recording Status Banner when listening */}
+      {isListening && (
+        <div className="bg-rose-50 border-t border-rose-200 px-4 py-2 flex items-center justify-between text-xs text-rose-800 font-semibold animate-pulse shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping"></span>
+            <span>🎙️ Listening continuously... Speak naturally in English or Hindi (Tap mic to finish)</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleListening}
+            className="px-2 py-0.5 rounded bg-rose-600 text-white text-[10px] font-bold uppercase hover:bg-rose-700 transition"
+          >
+            Done
+          </button>
+        </div>
+      )}
+
+      {/* Input Box with Continuous Mic + Send */}
       <form onSubmit={handleSendMessage} className="p-3.5 border-t border-slate-100 bg-white flex items-center gap-2 shrink-0">
         
-        {/* Voice Input Mic Button */}
+        {/* Continuous Voice Input Mic Button */}
         <button
           type="button"
           onClick={handleToggleListening}
-          title={isListening ? "Listening... click to stop" : "Speak your question (Voice Input)"}
-          className={`p-3 rounded-2xl transition flex items-center justify-center shrink-0 shadow-xs ${
+          title={isListening ? "Listening... click to stop recording" : "Click to speak with voice (Continuous Voice Input)"}
+          className={`p-3 rounded-2xl transition flex items-center justify-center shrink-0 shadow-xs cursor-pointer ${
             isListening 
-              ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-100' 
+              ? 'bg-rose-600 text-white animate-pulse ring-4 ring-rose-100 scale-105' 
               : 'bg-slate-100 text-slate-600 hover:text-sky-600 hover:bg-sky-50'
           }`}
         >
@@ -317,7 +409,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={isListening ? "🎙️ Listening to your voice..." : `Ask Vayu anything about weather in ${currentLocation?.name?.split(',')[0]}...`}
+            placeholder={isListening ? "🎙️ Transcribing your speech..." : `Ask Vayu anything about weather in ${currentLocation?.name?.split(',')[0]}...`}
             className="w-full bg-transparent outline-none text-xs md:text-sm text-slate-800 placeholder-slate-400"
           />
         </div>
@@ -326,7 +418,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
         <button
           type="submit"
           disabled={isThinking || !query.trim()}
-          className="p-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 disabled:opacity-50 text-white rounded-2xl shadow-md shadow-sky-500/20 transition shrink-0"
+          className="p-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 disabled:opacity-50 text-white rounded-2xl shadow-md shadow-sky-500/20 transition shrink-0 cursor-pointer"
         >
           <Send className="w-4 h-4" />
         </button>
