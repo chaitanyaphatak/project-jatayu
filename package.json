@@ -1,0 +1,10 @@
+{
+  "name": "weathergpt-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter weathergpt-frontend dev",
+    "build": "pnpm --filter weathergpt-frontend build",
+    "preview": "pnpm --filter weathergpt-frontend preview"
+  }
+}
