@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { 
   Sparkles, ArrowUp, Volume2, VolumeX, ShieldCheck, 
   MapPin, Sprout, Plane, Flame, Building2, Mic, MicOff,
-  Bot, Copy, Check, Radio, StopCircle
+  Bot, Copy, Check, Radio, Zap
 } from 'lucide-react'
 
 export default function ChatPage({ currentLocation, weather, userRole, cropStage, user, isSignedIn, getToken }) {
@@ -122,10 +122,11 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
     }
   }
 
-  // Handle Send Question
-  const handleSendMessage = async (e) => {
+  // Handle Send Question (supports direct string trigger from "Try asking" chips)
+  const handleSendMessage = async (e, overrideText = null) => {
     e?.preventDefault()
-    if (!query.trim() || isThinking) return
+    const textToSend = (overrideText || query).trim()
+    if (!textToSend || isThinking) return
 
     // Stop listening if mic was active
     if (isListening) {
@@ -136,9 +137,8 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
       } catch {}
     }
 
-    const userMsg = { id: Date.now(), sender: 'user', text: query }
+    const userMsg = { id: Date.now(), sender: 'user', text: textToSend }
     setMessages(prev => [...prev, userMsg])
-    const currentQuery = query
     setQuery('')
     baseTranscriptRef.current = ''
     setIsThinking(true)
@@ -152,7 +152,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          query: currentQuery,
+          query: textToSend,
           latitude: currentLocation?.lat || 18.5204,
           longitude: currentLocation?.lon || 73.8567,
           location_name: currentLocation?.name || 'Local Station',
@@ -195,7 +195,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
     }
   }
 
-  // Text-to-Speech playback (ChatGPT-style Read Aloud)
+  // Text-to-Speech playback with complete symbol cleaning (no weird symbol reading!)
   const handleSpeakText = (messageId, text) => {
     if (activeSpeechId === messageId) {
       if ('speechSynthesis' in window) {
@@ -207,7 +207,21 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
 
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel()
-      const cleanText = text.replace(/[*_#•`]/g, '').trim()
+
+      // Clean all symbols and technical syntax for natural voice readout
+      let cleanText = text
+        .replace(/https?:\/\/\S+/gi, '') // Remove web links
+        .replace(/[*_#`~|•▪▫–—\\]/g, ' ') // Strip markdown symbols & bullet dots
+        .replace(/\b°C\b|\b°c\b/gi, ' degrees Celsius ')
+        .replace(/°/g, ' degrees ')
+        .replace(/%/g, ' percent ')
+        .replace(/km\/h/gi, ' kilometers per hour ')
+        .replace(/hPa/gi, ' hectopascals ')
+        .replace(/[\(\)\[\]\{\}]/g, ', ') // Replace brackets with smooth speech pauses
+        .replace(/[:;]/g, '. ')
+        .replace(/\s+/g, ' ')
+        .trim()
+
       const utterance = new SpeechSynthesisUtterance(cleanText)
       utterance.rate = 0.95
       utterance.pitch = 1.0
@@ -228,37 +242,37 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
   }
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-140px)] min-h-[600px] animate-in fade-in duration-200">
+    <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-[calc(100vh-140px)] min-h-[600px] animate-in fade-in duration-200">
 
-      {/* Chat Header: Unique VAYU AI Persona */}
-      <div className="border-b border-slate-100 p-4 bg-gradient-to-r from-sky-50/80 via-white to-blue-50/50 flex items-center justify-between flex-wrap gap-2 shrink-0">
+      {/* Chat Header: Fresh & Vibrant VAYU AI Persona */}
+      <div className="border-b border-slate-100 p-4 bg-gradient-to-r from-sky-50/90 via-blue-50/40 to-indigo-50/60 flex items-center justify-between flex-wrap gap-2 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-sky-500/25 ring-2 ring-sky-100">
             <Bot className="w-5 h-5 text-white" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-base font-black text-slate-900">
+              <span className="text-base font-extrabold text-slate-900 tracking-tight">
                 VAYU AI Assistant
               </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-2xs">
-                Smart Copilot
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-2xs flex items-center gap-1">
+                <Zap className="w-2.5 h-2.5 fill-white" /> Smart Copilot
               </span>
             </div>
             <span className="text-xs text-slate-500 font-medium">
-              Real-time weather insights & farming guide for {currentLocation?.name?.split(',')[0]}
+              Real-time weather insights & farming guide for <strong className="text-slate-700">{currentLocation?.name?.split(',')[0]}</strong>
             </span>
           </div>
         </div>
 
         <div className="text-xs text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 font-bold flex items-center gap-1.5 shadow-2xs">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          Live Radar Connected
+          Live Weather Intelligence
         </div>
       </div>
 
       {/* Messages Feed */}
-      <div className="flex-1 p-5 overflow-y-auto space-y-5">
+      <div className="flex-1 p-5 overflow-y-auto space-y-5 bg-gradient-to-b from-slate-50/30 to-white">
         {messages.map((m) => (
           <div 
             key={m.id} 
@@ -267,8 +281,8 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
             <div 
               className={`max-w-[85%] rounded-3xl px-5 py-4 text-sm leading-relaxed ${
                 m.sender === 'user' 
-                  ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-br-xs shadow-md shadow-sky-500/15' 
-                  : 'bg-slate-50 border border-slate-200/90 text-slate-800 rounded-bl-xs shadow-xs'
+                  ? 'bg-gradient-to-r from-sky-500 via-sky-600 to-blue-600 text-white rounded-br-xs shadow-md shadow-sky-500/15 font-medium' 
+                  : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs shadow-xs'
               }`}
             >
               {/* Message Content */}
@@ -276,17 +290,17 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
 
               {/* ChatGPT-style Bottom Action Toolbar for AI Responses */}
               {m.sender === 'assistant' && (
-                <div className="mt-3.5 pt-2.5 border-t border-slate-200/80 flex items-center justify-between flex-wrap gap-2 text-xs text-slate-500">
+                <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2 text-xs text-slate-500">
                   <div className="flex items-center gap-2">
                     
                     {/* Read Aloud Button (Bottom placed) */}
                     <button
                       type="button"
                       onClick={() => handleSpeakText(m.id, m.text)}
-                      className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 font-semibold transition cursor-pointer ${
+                      className={`px-3 py-1 rounded-xl flex items-center gap-1.5 font-semibold transition cursor-pointer ${
                         activeSpeechId === m.id 
                           ? 'bg-rose-100 text-rose-700 font-bold' 
-                          : 'bg-white hover:bg-slate-200/80 text-slate-700 border border-slate-200/80'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
                       }`}
                       title={activeSpeechId === m.id ? 'Stop listening' : 'Read aloud response'}
                     >
@@ -307,7 +321,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
                     <button
                       type="button"
                       onClick={() => handleCopyText(m.id, m.text)}
-                      className="px-2.5 py-1 rounded-xl bg-white hover:bg-slate-200/80 text-slate-700 border border-slate-200/80 flex items-center gap-1.5 font-semibold transition cursor-pointer"
+                      className="px-3 py-1 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5 font-semibold transition cursor-pointer"
                       title="Copy text"
                     >
                       {copiedId === m.id ? (
@@ -343,7 +357,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
         {/* Polished Thinking Animation */}
         {isThinking && (
           <div className="flex flex-col items-start animate-fade-in">
-            <div className="bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-3xl rounded-bl-xs px-4 py-3 text-xs text-sky-800 font-semibold flex items-center gap-2.5 shadow-sm">
+            <div className="bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-3xl rounded-bl-xs px-4 py-3 text-xs text-sky-800 font-semibold flex items-center gap-2.5 shadow-xs">
               <div className="w-4 h-4 border-2 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
               <span>Vayu AI is analyzing live weather and satellite data for {currentLocation?.name?.split(',')[0]}...</span>
             </div>
@@ -351,7 +365,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
         )}
       </div>
 
-      {/* Suggested Quick Questions */}
+      {/* Suggested Quick Questions: Clicking sends immediately to AI */}
       <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar text-xs shrink-0">
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
           Try asking:
@@ -360,8 +374,8 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
           <button
             key={idx}
             type="button"
-            onClick={() => setQuery(p)}
-            className="whitespace-nowrap px-3 py-1.5 rounded-full bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 hover:border-sky-200 shadow-xs transition text-xs font-semibold cursor-pointer"
+            onClick={() => handleSendMessage(null, p)}
+            className="whitespace-nowrap px-3.5 py-1.5 rounded-full bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-700 border border-slate-200 hover:border-sky-300 shadow-2xs transition text-xs font-semibold cursor-pointer active:scale-95"
           >
             {p}
           </button>
@@ -369,7 +383,7 @@ export default function ChatPage({ currentLocation, weather, userRole, cropStage
       </div>
 
       {/* Input Box with Claude-style Animated Send Button */}
-      <form onSubmit={handleSendMessage} className="p-3.5 border-t border-slate-100 bg-white flex items-center gap-2.5 shrink-0">
+      <form onSubmit={(e) => handleSendMessage(e)} className="p-3.5 border-t border-slate-100 bg-white flex items-center gap-2.5 shrink-0">
         
         {/* Continuous Voice Input Mic Button */}
         <button
