@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react'
 import { 
   Calendar, Clock, Sun, CloudRain, Wind, Droplets, 
-  Gauge, Umbrella, ArrowUp, ArrowDown, ChevronRight, RefreshCw, BarChart2
+  Gauge, Umbrella, ArrowUp, ArrowDown, ChevronRight, RefreshCw, BarChart2,
+  Sparkles
 } from 'lucide-react'
 
 export default function ForecastPage({ currentLocation, weather }) {
   const [forecastData, setForecastData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isSpinning, setIsSpinning] = useState(false)
   const [selectedDay, setSelectedDay] = useState(0) // index in 7 days
   const [selectedMetric, setSelectedMetric] = useState('temp') // 'temp' | 'rain' | 'wind' | 'humidity'
 
-  const fetchForecast = async () => {
+  const fetchForecast = async (animate = false) => {
     setLoading(true)
+    if (animate) setIsSpinning(true)
     try {
       const lat = currentLocation?.lat || 18.5204
       const lon = currentLocation?.lon || 73.8567
@@ -24,11 +27,14 @@ export default function ForecastPage({ currentLocation, weather }) {
       console.warn('Forecast fetch error:', e)
     } finally {
       setLoading(false)
+      if (animate) {
+        setTimeout(() => setIsSpinning(false), 800)
+      }
     }
   }
 
   useEffect(() => {
-    fetchForecast()
+    fetchForecast(false)
   }, [currentLocation])
 
   const dailyList = forecastData?.daily || [
@@ -53,18 +59,22 @@ export default function ForecastPage({ currentLocation, weather }) {
             <Calendar className="w-5 h-5 text-sky-600" />
             7-Day Detailed Forecast & 24h Hourly Progression
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Hyperlocal meteorological predictions for <strong className="text-slate-800">{currentLocation?.name}</strong>
+          <p className="text-xs text-slate-500 mt-0.5 font-medium">
+            Hyperlocal predictions for <strong className="text-slate-800">{currentLocation?.name}</strong>
           </p>
         </div>
 
+        {/* Refresh button with smooth animated spring / spin */}
         <button
-          onClick={fetchForecast}
+          type="button"
+          onClick={() => fetchForecast(true)}
           disabled={loading}
-          className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200 shadow-xs transition flex items-center gap-1.5"
+          className={`px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200 shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95 ${
+            isSpinning ? 'border-sky-300 ring-2 ring-sky-100' : ''
+          }`}
         >
-          <RefreshCw className={`w-3.5 h-3.5 text-sky-600 ${loading ? 'animate-spin' : ''}`} />
-          Refresh Forecast
+          <RefreshCw className={`w-3.5 h-3.5 text-sky-600 transition-transform duration-700 ${isSpinning || loading ? 'animate-spin' : ''}`} />
+          <span>{isSpinning ? 'Updating...' : 'Refresh Forecast'}</span>
         </button>
       </div>
 
@@ -73,8 +83,9 @@ export default function ForecastPage({ currentLocation, weather }) {
         {dailyList.map((day, idx) => (
           <button
             key={idx}
+            type="button"
             onClick={() => setSelectedDay(idx)}
-            className={`p-4 rounded-3xl text-left transition border ${
+            className={`p-4 rounded-3xl text-left transition border cursor-pointer ${
               selectedDay === idx
                 ? 'bg-sky-50 border-sky-300 shadow-md ring-2 ring-sky-100'
                 : 'bg-white border-slate-200/90 hover:bg-slate-50 shadow-xs'
@@ -105,29 +116,30 @@ export default function ForecastPage({ currentLocation, weather }) {
         ))}
       </div>
 
-      {/* 24-Hour Hourly Breakdown Section */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-5">
+      {/* 24-Hour Hourly Progression Section */}
+      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100">
           <div>
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Clock className="w-4 h-4 text-sky-600" />
               24-Hour Hourly Progression
             </h3>
-            <p className="text-xs text-slate-500">Hourly sequence synthesized from ECMWF & GFS physics</p>
+            <p className="text-xs text-slate-500 font-medium">Synthesized multi-source hourly atmospheric sequence</p>
           </div>
 
           {/* Metric Selector Tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold overflow-x-auto no-scrollbar max-w-full">
             {[
               { id: 'temp', label: 'Temperature (°C)' },
-              { id: 'rain', label: 'Precipitation Prob (%)' },
+              { id: 'rain', label: 'Rain Prob (%)' },
               { id: 'humidity', label: 'Humidity (%)' },
-              { id: 'wind', label: 'Wind Speed (km/h)' }
+              { id: 'wind', label: 'Wind (km/h)' }
             ].map((m) => (
               <button
                 key={m.id}
+                type="button"
                 onClick={() => setSelectedMetric(m.id)}
-                className={`px-3 py-1 rounded-xl transition ${
+                className={`px-3 py-1 rounded-xl transition cursor-pointer whitespace-nowrap ${
                   selectedMetric === m.id ? 'bg-sky-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >

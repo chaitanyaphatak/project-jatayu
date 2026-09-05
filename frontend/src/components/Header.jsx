@@ -4,7 +4,7 @@ import { SignedIn, SignedOut, SignInButton, useUser, useClerk } from '@clerk/cle
 import { 
   AlertTriangle, Sprout, Plane, Flame, Building2, 
   PlusCircle, LogIn, Menu, CloudRain, CheckCircle2, 
-  ChevronDown, User, LogOut, Settings, BellRing
+  ChevronDown, User, LogOut, Settings
 } from 'lucide-react'
 import IndiaSearchBar from './IndiaSearchBar'
 
@@ -54,16 +54,16 @@ export default function Header({
 
   const formattedAlertTitle = systemAlert?.title 
     ? systemAlert.title.replace(/Hyperlocal Meteorological Advisory/i, 'Weather Advisory')
-    : 'Local Weather Update'
+    : 'Local Advisory'
 
   return (
     <header className="border-b border-slate-200/90 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-xs">
       
-      {/* 1. Main Header Bar: Logo, Search, Persona Switcher & Auth */}
-      <div className="px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap lg:flex-nowrap">
+      {/* 1. Main Header Bar */}
+      <div className="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2.5 sm:gap-3 flex-wrap lg:flex-nowrap">
         
         {/* Left Side: Mobile Menu Button + Clickable Brand Logo */}
-        <div className="flex items-center gap-2 lg:hidden">
+        <div className="flex items-center gap-2 lg:hidden shrink-0">
           <button
             onClick={onToggleMobileMenu}
             aria-label="Open mobile menu"
@@ -81,12 +81,12 @@ export default function Header({
             className="flex items-center gap-1.5 font-black text-slate-900 text-sm"
           >
             <CloudRain className="w-5 h-5 text-sky-600" />
-            <span>WeatherGPT</span>
+            <span className="hidden xs:inline">WeatherGPT</span>
           </Link>
         </div>
 
         {/* Pan-India Search Bar */}
-        <div className="flex-1 max-w-xl">
+        <div className="flex-1 min-w-[200px] max-w-xl">
           <IndiaSearchBar 
             currentLocation={currentLocation}
             onSelectLocation={onSelectLocation}
@@ -95,9 +95,9 @@ export default function Header({
         </div>
 
         {/* Role Persona Switcher & Auth Actions */}
-        <div className="flex items-center gap-2 shrink-0 ml-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
           
-          {/* Persona Segmented Control */}
+          {/* Persona Segmented Control (Desktop & Tablet) */}
           <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
             <button
               onClick={() => setUserRole('farmer')}
@@ -136,10 +136,11 @@ export default function Header({
           {/* Submit Ground Report Action */}
           <button
             onClick={onOpenReportModal}
-            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
           >
-            <PlusCircle className="w-3.5 h-3.5 text-amber-600" />
-            <span className="hidden sm:inline">Report Weather</span>
+            <PlusCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+            <span className="hidden md:inline">Report Weather</span>
+            <span className="md:hidden">Report</span>
           </button>
 
           {/* Clerk Auth: Full clickable user pill with compact popup menu */}
@@ -148,7 +149,7 @@ export default function Header({
               <button
                 type="button"
                 onClick={() => setIsUserMenuOpen(prev => !prev)}
-                className="flex items-center gap-2.5 bg-white pl-2 pr-3 py-1.5 rounded-2xl border border-slate-200/90 shadow-xs hover:border-sky-300 hover:bg-sky-50/40 transition cursor-pointer select-none"
+                className="flex items-center gap-2 bg-white p-1 sm:pl-2 sm:pr-3 sm:py-1.5 rounded-2xl border border-slate-200/90 shadow-xs hover:border-sky-300 hover:bg-sky-50/40 transition cursor-pointer select-none"
                 title="Account Menu"
               >
                 {/* User Avatar Image */}
@@ -164,9 +165,9 @@ export default function Header({
                   </div>
                 )}
 
-                {/* User Name & Active Badge */}
+                {/* User Name & Active Badge (Desktop) */}
                 <div className="hidden sm:block text-left text-xs leading-tight">
-                  <p className="font-bold text-slate-800 truncate max-w-[120px]">
+                  <p className="font-bold text-slate-800 truncate max-w-[110px]">
                     {user?.firstName || user?.fullName?.split(' ')[0] || 'User'}
                   </p>
                   <div className="flex items-center gap-1 mt-0.5">
@@ -177,7 +178,7 @@ export default function Header({
                   </div>
                 </div>
 
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`hidden sm:block w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Compact Custom Dropdown Popover */}
@@ -262,19 +263,19 @@ export default function Header({
 
       </div>
 
-      {/* 2. Improved Proactive Alert Bar (Clean typography, fully readable without truncation cut-off) */}
-      <aside aria-label="Weather advisory banner" className="bg-gradient-to-r from-amber-50/95 via-amber-100/40 to-orange-50/95 border-t border-amber-200/80 px-4 py-2 text-xs text-amber-950 flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0"></span>
-          <span className="font-extrabold text-amber-900 uppercase tracking-wide text-[10px] bg-amber-200/90 px-2 py-0.5 rounded-full border border-amber-300/80 shrink-0">
-            {currentLocation?.name?.split(',')[0] || 'INDIA'} ADVISORY
+      {/* 2. Compact Proactive Alert Bar (Mobile-friendly, responsive) */}
+      <aside aria-label="Weather advisory banner" className="bg-gradient-to-r from-amber-50/95 via-amber-100/40 to-orange-50/95 border-t border-amber-200/80 px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs text-amber-950 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+          <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-amber-500 animate-ping shrink-0"></span>
+          <span className="font-extrabold text-amber-900 uppercase tracking-wide text-[9px] sm:text-[10px] bg-amber-200/90 px-1.5 sm:px-2 py-0.2 sm:py-0.5 rounded-full border border-amber-300/80 shrink-0">
+            {currentLocation?.name?.split(',')[0] || 'INDIA'}
           </span>
-          <p className="text-xs text-slate-800 font-medium leading-normal">
+          <p className="text-[11px] sm:text-xs text-slate-800 font-medium truncate sm:overflow-visible sm:whitespace-normal">
             <strong className="text-slate-900">{formattedAlertTitle}:</strong> {formattedAlertDetail}
           </p>
         </div>
-        <span className="hidden md:inline-flex items-center px-2.5 py-0.5 rounded-full bg-white/90 text-emerald-800 border border-emerald-200 text-[10px] font-bold shrink-0 shadow-2xs">
-          <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" /> Live Update
+        <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full bg-white/90 text-emerald-800 border border-emerald-200 text-[10px] font-bold shrink-0 shadow-2xs">
+          <CheckCircle2 className="w-3 h-3 mr-1 text-emerald-600" /> Live
         </span>
       </aside>
 
