@@ -3,7 +3,8 @@ import { NavLink, useLocation, Link } from 'react-router-dom'
 import { 
   BarChart3, Calendar, AlertTriangle, Layers, Sparkles, 
   Sprout, Users, TrendingUp, Settings, CloudRain, 
-  Award, PanelLeftClose, PanelLeftOpen, MapPin
+  Award, PanelLeftClose, PanelLeftOpen, MapPin, Radio,
+  ShieldCheck, Activity, Wind
 } from 'lucide-react'
 
 export default function Sidebar({ 
@@ -16,7 +17,7 @@ export default function Sidebar({
   const location = useLocation()
 
   const navItems = [
-    { to: '/overview', label: 'Overview', icon: BarChart3, badge: 'Live' },
+    { to: '/overview', label: 'Dashboard', icon: BarChart3, badge: 'Live' },
     { to: '/forecast', label: '7-Day Forecast', icon: Calendar },
     { to: '/alerts', label: 'Weather Alerts', icon: AlertTriangle, badge: 'Active', badgeColor: 'bg-amber-100 text-amber-800' },
     { to: '/maps', label: 'Interactive Maps & Radar', icon: Layers },
@@ -58,10 +59,10 @@ export default function Sidebar({
                     WeatherGPT
                   </span>
                   <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
-                    LIVE
+                    PRO
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 font-medium truncate">Smart Weather Platform</p>
+                <p className="text-[11px] text-slate-400 font-medium truncate">Pan-India Smart Weather</p>
               </div>
             )}
           </Link>
@@ -72,7 +73,7 @@ export default function Sidebar({
             onClick={onToggleCollapse}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition shrink-0 cursor-pointer"
           >
             {isCollapsed ? (
               <PanelLeftOpen className="w-5 h-5 text-sky-600" />
@@ -84,10 +85,10 @@ export default function Sidebar({
       </div>
 
       {/* Navigation Section Links */}
-      <nav className={`flex-1 overflow-y-auto overflow-x-hidden space-y-1.5 py-3 bg-white ${isCollapsed ? 'px-2.5' : 'px-3'}`}>
+      <nav className={`flex-1 overflow-y-auto overflow-x-hidden space-y-1.5 py-2.5 bg-white ${isCollapsed ? 'px-2.5' : 'px-3'}`}>
         {!isCollapsed && (
           <p className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Menu
+            Navigation
           </p>
         )}
         
@@ -135,6 +136,38 @@ export default function Sidebar({
             </NavLink>
           )
         })}
+
+        {/* Rich Live Telemetry & Agro-Radar Widget (Fills space under navigation) */}
+        {!isCollapsed && (
+          <div className="pt-3 px-1 space-y-2">
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-sky-50/80 via-blue-50/40 to-indigo-50/30 border border-sky-100/90 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-sky-800 flex items-center gap-1">
+                  <Radio className="w-3 h-3 text-sky-600 animate-pulse" /> Live Doppler Stream
+                </span>
+                <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                  96% Synced
+                </span>
+              </div>
+              <div className="space-y-1 text-[11px] text-slate-600 font-medium">
+                <p className="flex items-center justify-between">
+                  <span>Radar Echo:</span>
+                  <strong className="text-slate-800">25 km Active</strong>
+                </p>
+                <p className="flex items-center justify-between">
+                  <span>Agro Window:</span>
+                  <strong className="text-emerald-700">Favorable</strong>
+                </p>
+              </div>
+              <Link
+                to="/chat"
+                className="w-full py-1.5 px-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold text-center block transition shadow-2xs"
+              >
+                Ask Vayu AI ✨
+              </Link>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Sidebar Location & Trust Score Footer */}

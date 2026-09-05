@@ -4,7 +4,7 @@ import { SignedIn, SignedOut, SignInButton, useUser, useClerk } from '@clerk/cle
 import { 
   AlertTriangle, Sprout, Plane, Flame, Building2, 
   PlusCircle, LogIn, Menu, CloudRain, CheckCircle2, 
-  ChevronDown, User, LogOut, Settings
+  ChevronDown, User, LogOut, Settings, Plus
 } from 'lucide-react'
 import IndiaSearchBar from './IndiaSearchBar'
 
@@ -59,17 +59,17 @@ export default function Header({
   return (
     <header className="border-b border-slate-200/90 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-xs">
       
-      {/* 1. Main Header Bar */}
-      <div className="px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-2.5 sm:gap-3 flex-wrap lg:flex-nowrap">
+      {/* 1. Main Header Bar: Single Row on All Devices (Zero Wrapping) */}
+      <div className="px-2.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-1.5 sm:gap-3 flex-nowrap w-full">
         
-        {/* Left Side: Mobile Menu Button + Clickable Brand Logo */}
-        <div className="flex items-center gap-2 lg:hidden shrink-0">
+        {/* Left Side: Mobile Menu Button + Brand Logo */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={onToggleMobileMenu}
             aria-label="Open mobile menu"
-            className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition cursor-pointer lg:hidden"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <Link 
             to="/overview" 
@@ -78,15 +78,17 @@ export default function Header({
                 window.location.reload()
               }
             }}
-            className="flex items-center gap-1.5 font-black text-slate-900 text-sm"
+            className="flex items-center gap-1 font-black text-slate-900 text-xs sm:text-sm shrink-0"
           >
-            <CloudRain className="w-5 h-5 text-sky-600" />
-            <span className="hidden xs:inline">WeatherGPT</span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-2xs">
+              <CloudRain className="w-4 h-4" />
+            </div>
+            <span className="hidden md:inline">WeatherGPT</span>
           </Link>
         </div>
 
-        {/* Pan-India Search Bar */}
-        <div className="flex-1 min-w-[200px] max-w-xl">
+        {/* Pan-India Search Bar: Compact & Responsive */}
+        <div className="flex-1 min-w-0 max-w-xl mx-1 sm:mx-2">
           <IndiaSearchBar 
             currentLocation={currentLocation}
             onSelectLocation={onSelectLocation}
@@ -94,11 +96,11 @@ export default function Header({
           />
         </div>
 
-        {/* Role Persona Switcher & Auth Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
+        {/* Right Side: Role Persona (Desktop) + Report + Auth Pill (Single Line) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           
-          {/* Persona Segmented Control (Desktop & Tablet) */}
-          <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
+          {/* Persona Segmented Control (Desktop Only) */}
+          <div className="hidden lg:flex items-center gap-1 bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
             <button
               onClick={() => setUserRole('farmer')}
               className={`px-2.5 py-1 rounded-xl flex items-center gap-1 transition cursor-pointer ${
@@ -133,23 +135,23 @@ export default function Header({
             </button>
           </div>
 
-          {/* Submit Ground Report Action */}
+          {/* Submit Ground Report Button: Icon on Mobile, Full on Tablet/PC */}
           <button
             onClick={onOpenReportModal}
-            className="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+            title="Report Local Weather"
+            className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1.5 transition shadow-2xs cursor-pointer shrink-0"
           >
-            <PlusCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span className="hidden md:inline">Report Weather</span>
-            <span className="md:hidden">Report</span>
+            <PlusCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="hidden sm:inline">Report</span>
           </button>
 
-          {/* Clerk Auth: Full clickable user pill with compact popup menu */}
+          {/* Clerk Auth Pill: Compact on Mobile, Full on PC */}
           <SignedIn>
-            <div className="relative" ref={userMenuRef}>
+            <div className="relative shrink-0" ref={userMenuRef}>
               <button
                 type="button"
                 onClick={() => setIsUserMenuOpen(prev => !prev)}
-                className="flex items-center gap-2 bg-white p-1 sm:pl-2 sm:pr-3 sm:py-1.5 rounded-2xl border border-slate-200/90 shadow-xs hover:border-sky-300 hover:bg-sky-50/40 transition cursor-pointer select-none"
+                className="flex items-center gap-1.5 sm:gap-2 bg-white p-1 sm:pl-2 sm:pr-3 sm:py-1.5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-sky-300 hover:bg-sky-50/40 transition cursor-pointer select-none"
                 title="Account Menu"
               >
                 {/* User Avatar Image */}
@@ -157,7 +159,7 @@ export default function Header({
                   <img 
                     src={user.imageUrl} 
                     alt={user.fullName || 'User'} 
-                    className="w-7 h-7 rounded-full object-cover ring-2 ring-sky-100 shrink-0" 
+                    className="w-7 h-7 sm:w-7 sm:h-7 rounded-full object-cover ring-2 ring-sky-100 shrink-0" 
                   />
                 ) : (
                   <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 ring-2 ring-sky-100">
@@ -165,9 +167,9 @@ export default function Header({
                   </div>
                 )}
 
-                {/* User Name & Active Badge (Desktop) */}
+                {/* User Name & Active Badge (Desktop Only) */}
                 <div className="hidden sm:block text-left text-xs leading-tight">
-                  <p className="font-bold text-slate-800 truncate max-w-[110px]">
+                  <p className="font-bold text-slate-800 truncate max-w-[100px]">
                     {user?.firstName || user?.fullName?.split(' ')[0] || 'User'}
                   </p>
                   <div className="flex items-center gap-1 mt-0.5">
@@ -247,14 +249,13 @@ export default function Header({
           </SignedIn>
 
           <SignedOut>
-            {/* Single Clerk Sign In */}
             <SignInButton mode="modal" afterSignInUrl="/overview" afterSignUpUrl="/overview">
               <button
                 id="header-signin-btn"
-                className="px-3 py-1.5 h-8 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                className="px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span>Sign In</span>
+                <span className="hidden xs:inline">Sign In</span>
               </button>
             </SignInButton>
           </SignedOut>
@@ -263,11 +264,11 @@ export default function Header({
 
       </div>
 
-      {/* 2. Compact Proactive Alert Bar (Mobile-friendly, responsive) */}
-      <aside aria-label="Weather advisory banner" className="bg-gradient-to-r from-amber-50/95 via-amber-100/40 to-orange-50/95 border-t border-amber-200/80 px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs text-amber-950 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-          <span className="w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-amber-500 animate-ping shrink-0"></span>
-          <span className="font-extrabold text-amber-900 uppercase tracking-wide text-[9px] sm:text-[10px] bg-amber-200/90 px-1.5 sm:px-2 py-0.2 sm:py-0.5 rounded-full border border-amber-300/80 shrink-0">
+      {/* 2. Compact Proactive Alert Bar */}
+      <aside aria-label="Weather advisory banner" className="bg-gradient-to-r from-amber-50/95 via-amber-100/40 to-orange-50/95 border-t border-amber-200/80 px-2.5 sm:px-4 py-1 sm:py-1.5 text-[11px] sm:text-xs text-amber-950 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 overflow-hidden">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping shrink-0"></span>
+          <span className="font-extrabold text-amber-900 uppercase tracking-wide text-[9px] sm:text-[10px] bg-amber-200/90 px-1.5 py-0.2 rounded-full border border-amber-300/80 shrink-0">
             {currentLocation?.name?.split(',')[0] || 'INDIA'}
           </span>
           <p className="text-[11px] sm:text-xs text-slate-800 font-medium truncate sm:overflow-visible sm:whitespace-normal">

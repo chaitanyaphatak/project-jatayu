@@ -19,27 +19,28 @@ import CommunityPage from './pages/CommunityPage'
 import ClimatePage from './pages/ClimatePage'
 import SettingsPage from './pages/SettingsPage'
 
+import { LocationItem, WeatherData, SystemAlert, CrowdReport, UserRole } from './types'
+
 export default function App() {
   const { isSignedIn, user } = useUser()
   const { getToken } = useAuth()
 
   // ─── localStorage helpers ───────────────────────────────────────────────────
-  // Keys are namespaced by Clerk user ID so each user gets their own data
-  const lsKey = (key) => `wgpt_${user?.id || 'guest'}_${key}`
+  const lsKey = (key: string) => `wgpt_${user?.id || 'guest'}_${key}`
 
-  const lsRead = (key, fallback) => {
+  const lsRead = <T,>(key: string, fallback: T): T => {
     try {
       const raw = localStorage.getItem(lsKey(key))
       return raw ? JSON.parse(raw) : fallback
     } catch { return fallback }
   }
 
-  const lsWrite = (key, value) => {
+  const lsWrite = (key: string, value: any) => {
     try { localStorage.setItem(lsKey(key), JSON.stringify(value)) } catch {}
   }
 
   // Default fallback location
-  const DEFAULT_LOCATION = {
+  const DEFAULT_LOCATION: LocationItem = {
     name: 'Pune (Haveli), Maharashtra',
     state: 'Maharashtra',
     region: 'West',
@@ -50,22 +51,28 @@ export default function App() {
     risk: 'Convective Updraft & Showers'
   }
 
-  // Active Pan-India Location State — restored from localStorage on load
-  const [currentLocation, setCurrentLocation] = useState(() =>
+  // Active Pan-India Location State
+  const [currentLocation, setCurrentLocation] = useState<LocationItem>(() =>
     lsRead('location', DEFAULT_LOCATION)
   )
 
-  // User Profile & Role State — restored from localStorage
-  const [userRole, setUserRole] = useState(() => lsRead('role', 'farmer'))
-  const [cropStage, setCropStage] = useState(() => lsRead('cropStage', 'Flowering & Pod Formation (Soybean)'))
-  const [trustScore, setTrustScore] = useState(() => lsRead('trustScore', 120))
+  // User Profile & Role State
+  const [userRole, setUserRole] = useState<UserRole>(() => lsRead('role', 'farmer'))
+  const [cropStage, setCropStage] = useState<string>(() => lsRead('cropStage', 'Flowering & Pod Formation (Soybean)'))
+  const [trustScore, setTrustScore] = useState<number>(() => lsRead('trustScore', 120))
+  const [language, setLanguage] = useState<string>(() => lsRead('language', 'en'))
+
+  const handleSetLanguage = (newLang: string) => {
+    setLanguage(newLang)
+    lsWrite('language', newLang)
+  }
 
   // Modals & Mobile Drawer State
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
-  // Desktop Collapsible Sidebar State with localStorage persistence
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+  // Desktop Collapsible Sidebar State
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('weathergpt_sidebar_collapsed') === 'true'
     } catch {
@@ -85,7 +92,7 @@ export default function App() {
 
   // Keyboard shortcut Ctrl+B / Cmd+B to toggle sidebar navigation
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault()
         toggleSidebar()
@@ -96,12 +103,12 @@ export default function App() {
   }, [])
 
   // Crowd Reports & Leaderboard State
-  const [crowdReports, setCrowdReports] = useState([])
-  const [leaderboard, setLeaderboard] = useState([])
-  const [nowcastCorrection, setNowcastCorrection] = useState(null)
+  const [crowdReports, setCrowdReports] = useState<CrowdReport[]>([])
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [nowcastCorrection, setNowcastCorrection] = useState<any>(null)
 
   // Live Weather Telemetry State
-  const [weather, setWeather] = useState({
+  const [weather, setWeather] = useState<WeatherData>({
     temp: 24.5,
     feelsLike: 26.2,
     condition: 'Partly cloudy with stratocumulus',
@@ -118,7 +125,7 @@ export default function App() {
   })
 
   // Proactive Alert Ticker State
-  const [systemAlert, setSystemAlert] = useState({
+  const [systemAlert, setSystemAlert] = useState<SystemAlert>({
     title: 'Hyperlocal Meteorological Advisory',
     detail: 'Optimal window for agrochemical spraying before afternoon convective cycle.',
     zScore: 'Isolation Forest: +1.0σ Anomaly'
@@ -187,8 +194,8 @@ export default function App() {
     }
   }
 
-  // Handle location selection — persist to localStorage
-  const handleSelectLocation = (loc) => {
+  // Handle location selection
+  const handleSelectLocation = (loc: LocationItem) => {
     setCurrentLocation(loc)
     lsWrite('location', loc)
     fetchLiveWeather(loc.lat, loc.lon, loc.name)
@@ -197,19 +204,19 @@ export default function App() {
   }
 
   // Persist role changes
-  const handleSetUserRole = (role) => {
+  const handleSetUserRole = (role: UserRole) => {
     setUserRole(role)
     lsWrite('role', role)
   }
 
   // Persist cropStage changes
-  const handleSetCropStage = (stage) => {
+  const handleSetCropStage = (stage: string) => {
     setCropStage(stage)
     lsWrite('cropStage', stage)
   }
 
   // Persist trustScore changes
-  const handleAddTrustScore = (delta) => {
+  const handleAddTrustScore = (delta: number) => {
     setTrustScore(prev => {
       const next = prev + delta
       lsWrite('trustScore', next)
@@ -224,7 +231,7 @@ export default function App() {
         (pos) => {
           const lat = parseFloat(pos.coords.latitude.toFixed(4))
           const lon = parseFloat(pos.coords.longitude.toFixed(4))
-          const gpsLocation = {
+          const gpsLocation: LocationItem = {
             name: `Live Station (${lat}, ${lon})`,
             state: 'India',
             region: 'Local Sector',
@@ -255,25 +262,22 @@ export default function App() {
     return () => clearInterval(interval)
   }, [currentLocation, userRole, cropStage])
 
-  // ─── On sign-in: Restore user-specific data from localStorage ──────────────
-  // When a user authenticates, load their saved location, role, trustScore
+  // Restore user-specific data on sign-in
   useEffect(() => {
     if (isSignedIn && user) {
-      // Restore user-specific localStorage data (keyed by user ID)
-      const savedLocation = lsRead('location', null)
-      const savedRole = lsRead('role', null)
-      const savedCropStage = lsRead('cropStage', null)
-      const savedTrustScore = lsRead('trustScore', null)
+      const savedLocation = lsRead<LocationItem | null>('location', null)
+      const savedRole = lsRead<UserRole | null>('role', null)
+      const savedCropStage = lsRead<string | null>('cropStage', null)
+      const savedTrustScore = lsRead<number | null>('trustScore', null)
 
       if (savedLocation) setCurrentLocation(savedLocation)
       if (savedRole) setUserRole(savedRole)
       if (savedCropStage) setCropStage(savedCropStage)
       if (savedTrustScore !== null) setTrustScore(savedTrustScore)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, user?.id])
 
-  // ─── Sync profile to backend on sign-in ─────────────────────────────────────
+  // Sync profile to backend on sign-in
   useEffect(() => {
     async function syncBackendProfile() {
       if (isSignedIn && user) {
@@ -289,7 +293,7 @@ export default function App() {
               full_name: user.fullName || user.primaryEmailAddress?.emailAddress,
               role: userRole,
               crop_stage: cropStage,
-              language_preference: 'en'
+              language_preference: language
             })
           })
         } catch (err) {
@@ -301,7 +305,7 @@ export default function App() {
   }, [isSignedIn, user?.id])
 
   // Handle Ground Report Submission
-  const handleSubmitReport = async (reportData) => {
+  const handleSubmitReport = async (reportData: any) => {
     const token = isSignedIn ? await getToken() : 'guest_token'
     const res = await fetch('/api/v1/crowd/report', {
       method: 'POST',
@@ -357,12 +361,10 @@ export default function App() {
             onOpenReportModal={() => setIsReportModalOpen(true)}
             trustScore={trustScore}
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
-            isSidebarCollapsed={isSidebarCollapsed}
-            onToggleSidebar={toggleSidebar}
           />
 
           {/* Page Routing Views */}
-          <main className="p-4 sm:p-6 lg:p-8 flex-1 max-w-7xl w-full mx-auto">
+          <main className="p-3 sm:p-6 lg:p-8 flex-1 max-w-7xl w-full mx-auto">
             <Routes>
               <Route 
                 path="/" 
@@ -427,6 +429,7 @@ export default function App() {
                     user={user}
                     isSignedIn={isSignedIn}
                     getToken={getToken}
+                    language={language}
                   />
                 } 
               />
@@ -473,6 +476,8 @@ export default function App() {
                     setCropStage={handleSetCropStage}
                     currentLocation={currentLocation}
                     onSelectLocation={handleSelectLocation}
+                    language={language}
+                    setLanguage={handleSetLanguage}
                   />
                 } 
               />
