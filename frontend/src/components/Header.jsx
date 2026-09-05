@@ -1,10 +1,11 @@
 import React from 'react'
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignInButton, UserButton, useUser } from '@clerk/clerk-react'
 import { 
   AlertTriangle, Sprout, Plane, Flame, Building2, 
   PlusCircle, LogIn, Award, Menu, PanelLeftClose, PanelLeftOpen
 } from 'lucide-react'
 import IndiaSearchBar from './IndiaSearchBar'
+import GoogleSignInButton, { GoogleIcon } from './GoogleAuthButton'
 
 export default function Header({ 
   currentLocation, 
@@ -19,6 +20,7 @@ export default function Header({
   isSidebarCollapsed,
   onToggleSidebar
 }) {
+  const { user } = useUser()
   return (
     <header className="border-b border-slate-200/90 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-xs">
       {/* Top Proactive Alert Ticker */}
@@ -130,19 +132,42 @@ export default function Header({
             <span className="hidden sm:inline">Report Ground Truth</span>
           </button>
 
-          {/* Clerk Auth Integration */}
+          {/* Authentication Integration (Google OAuth + Clerk) */}
           <SignedIn>
-            <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex items-center gap-2 bg-white pl-2 pr-3 py-1 rounded-2xl border border-slate-200/90 shadow-xs">
               <UserButton afterSignOutUrl="/" />
+              <div className="hidden xl:block text-left text-xs leading-tight">
+                <p className="font-bold text-slate-800 truncate max-w-[110px]">
+                  {user?.firstName || user?.fullName || 'Active User'}
+                </p>
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span className="text-[10px] text-slate-400 capitalize">
+                    {user?.externalAccounts?.some(acc => acc.provider === 'oauth_google' || acc.verification?.strategy === 'oauth_google')
+                      ? 'Google' 
+                      : userRole}
+                  </span>
+                </div>
+              </div>
             </div>
           </SignedIn>
 
           <SignedOut>
-            <SignInButton mode="modal">
-              <button className="px-3 py-1.5 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1 shadow-xs transition">
-                <LogIn className="w-3.5 h-3.5" /> Sign In
-              </button>
-            </SignInButton>
+            <div className="flex items-center gap-1.5">
+              {/* Direct Google Sign-In */}
+              <GoogleSignInButton className="h-8">
+                <span className="hidden md:inline">Sign in with Google</span>
+                <span className="md:hidden">Google</span>
+              </GoogleSignInButton>
+
+              {/* General Clerk Modal Sign-In */}
+              <SignInButton mode="modal">
+                <button className="px-2.5 py-1.5 h-8 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1 shadow-xs transition">
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Sign In</span>
+                </button>
+              </SignInButton>
+            </div>
           </SignedOut>
 
         </div>

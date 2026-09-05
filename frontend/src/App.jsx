@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useUser, useAuth } from '@clerk/clerk-react'
+import { useUser, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
 
 // Layout Components
 import Sidebar from './components/Sidebar'
@@ -416,6 +416,7 @@ export default function App() {
                   />
                 } 
               />
+              <Route path="/sso-callback" element={<AuthenticateWithRedirectCallback />} />
               <Route path="*" element={<Navigate to="/overview" replace />} />
             </Routes>
           </main>

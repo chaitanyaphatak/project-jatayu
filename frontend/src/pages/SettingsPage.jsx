@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
 import { 
-  Settings, User, MapPin, Globe, Bell, Shield, 
-  Check, Plus, Trash2, Sprout, Plane, Flame, Building2
+  Settings, User, MapPin, Globe, Bell, Shield, ShieldCheck,
+  Check, Plus, Trash2, Sprout, Plane, Flame, Building2, LogIn, CheckCircle2
 } from 'lucide-react'
+import GoogleSignInButton, { GoogleIcon } from '../components/GoogleAuthButton'
 
 export default function SettingsPage({ 
   user, 
@@ -61,6 +62,96 @@ export default function SettingsPage({
         <p className="text-xs text-slate-500 mt-0.5">
           Configure persona profiles, saved agricultural plots, languages, and alert thresholds
         </p>
+      </div>
+
+      {/* Account & Google Authentication Card */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-sky-600" />
+            Account Authentication & Security
+          </h3>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+            OAuth 2.0 / SSO
+          </span>
+        </div>
+
+        <SignedIn>
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-sky-50/70 via-blue-50/40 to-slate-50 border border-sky-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="relative">
+                {user?.imageUrl ? (
+                  <img 
+                    src={user.imageUrl} 
+                    alt={user.fullName || 'User Avatar'} 
+                    className="w-12 h-12 rounded-2xl object-cover ring-2 ring-sky-200 shadow-xs"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-2xl bg-sky-600 text-white flex items-center justify-center font-black text-base shadow-xs">
+                    {user?.firstName?.[0] || 'U'}
+                  </div>
+                )}
+                <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white flex items-center justify-center text-[9px] text-white font-bold">
+                  ✓
+                </span>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-extrabold text-sm text-slate-900">
+                    {user?.fullName || user?.firstName || 'Authenticated Member'}
+                  </p>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Verified
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 font-medium">
+                  {user?.primaryEmailAddress?.emailAddress || 'No email attached'}
+                </p>
+
+                {/* Google Connected Indicator */}
+                <div className="flex items-center gap-2 mt-1.5">
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white border border-slate-200/80 text-[11px] font-semibold text-slate-700 shadow-2xs">
+                    <GoogleIcon className="w-3 h-3" />
+                    <span>
+                      {user?.externalAccounts?.some(acc => acc.provider === 'oauth_google' || acc.verification?.strategy === 'oauth_google') || user?.primaryEmailAddress?.emailAddress?.includes('@gmail.com')
+                        ? 'Google OAuth Connected'
+                        : 'Google Account Supported'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              <UserButton afterSignOutUrl="/" />
+            </div>
+          </div>
+        </SignedIn>
+
+        <SignedOut>
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-sky-50/30 to-blue-50/20 border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-900">
+                Sign in with Google to unlock full sync & features
+              </p>
+              <p className="text-[11px] text-slate-500 max-w-md">
+                Sync saved agricultural plots, access high-resolution Doppler overlays, and participate in community ground-truth reporting.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <GoogleSignInButton className="px-4 py-2 text-xs">
+                Continue with Google
+              </GoogleSignInButton>
+              <SignInButton mode="modal">
+                <button className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+                  Other Options
+                </button>
+              </SignInButton>
+            </div>
+          </div>
+        </SignedOut>
       </div>
 
       {/* Profile & Persona Management Card */}
