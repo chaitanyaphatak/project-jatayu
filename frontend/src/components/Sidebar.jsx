@@ -1,5 +1,5 @@
 import React from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, Link } from 'react-router-dom'
 import { 
   BarChart3, Calendar, AlertTriangle, Layers, Sparkles, 
   Sprout, Users, TrendingUp, Settings, CloudRain, 
@@ -17,41 +17,54 @@ export default function Sidebar({
 
   const navItems = [
     { to: '/overview', label: 'Overview', icon: BarChart3, badge: 'Live' },
-    { to: '/forecast', label: '7-Day & Hourly Forecast', icon: Calendar },
-    { to: '/alerts', label: 'Alerts & Anomalies', icon: AlertTriangle, badge: 'Active', badgeColor: 'bg-amber-100 text-amber-800' },
+    { to: '/forecast', label: '7-Day Forecast', icon: Calendar },
+    { to: '/alerts', label: 'Weather Alerts', icon: AlertTriangle, badge: 'Active', badgeColor: 'bg-amber-100 text-amber-800' },
     { to: '/maps', label: 'Interactive Maps & Radar', icon: Layers },
-    { to: '/chat', label: 'WeatherGPT AI Assistant', icon: Sparkles, badge: 'AI', badgeColor: 'bg-sky-100 text-sky-700' },
-    { to: '/advisory', label: 'Agricultural & Aviation', icon: Sprout },
-    { to: '/community', label: 'Community Ground Truth', icon: Users },
-    { to: '/climate', label: 'Climate Trends & History', icon: TrendingUp },
-    { to: '/settings', label: 'Settings & Preferences', icon: Settings }
+    { to: '/chat', label: 'Vayu AI Assistant', icon: Sparkles, badge: 'AI', badgeColor: 'bg-sky-100 text-sky-700' },
+    { to: '/advisory', label: 'Farmer & Aviation Guide', icon: Sprout },
+    { to: '/community', label: 'Community Reports', icon: Users },
+    { to: '/climate', label: 'Climate & History', icon: TrendingUp },
+    { to: '/settings', label: 'Settings', icon: Settings }
   ]
+
+  const handleLogoClick = () => {
+    if (location.pathname === '/overview' || location.pathname === '/') {
+      window.location.reload()
+    }
+  }
 
   return (
     <aside 
-      className={`bg-white border-r border-slate-200/90 h-screen sticky top-0 flex flex-col justify-between shrink-0 hidden lg:flex select-none z-30 shadow-xs transition-[width] duration-300 ease-in-out ${
+      className={`bg-white border-r border-slate-200/90 h-screen sticky top-0 flex flex-col justify-between shrink-0 hidden lg:flex select-none z-30 shadow-xs transition-all duration-300 ease-in-out ${
         isCollapsed ? 'w-20' : 'w-64'
       }`}
     >
       {/* Brand Header & Toggle */}
-      <div className="border-b border-slate-100 shrink-0">
+      <div className="border-b border-slate-100 shrink-0 bg-white">
         <div className={`p-4 flex items-center ${isCollapsed ? 'flex-col gap-3 justify-center' : 'justify-between gap-3'}`}>
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 via-sky-600 to-blue-600 flex items-center justify-center shadow-md shadow-sky-500/20 ring-2 ring-sky-100 shrink-0">
+          <Link 
+            to="/overview"
+            onClick={handleLogoClick}
+            title="Click to go to Overview / Refresh"
+            className="flex items-center gap-3 min-w-0 cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 via-sky-600 to-blue-600 flex items-center justify-center shadow-md shadow-sky-500/20 ring-2 ring-sky-100 shrink-0 group-hover:scale-105 transition-transform">
               <CloudRain className="w-5 h-5 text-white" />
             </div>
             {!isCollapsed && (
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-base tracking-tight text-slate-900 truncate">WeatherGPT</span>
+                  <span className="font-extrabold text-base tracking-tight text-slate-900 truncate group-hover:text-sky-600 transition-colors">
+                    WeatherGPT
+                  </span>
                   <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
-                    PRO
+                    LIVE
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 font-medium truncate">Pan-India AI Intelligence</p>
+                <p className="text-[11px] text-slate-400 font-medium truncate">Smart Weather Platform</p>
               </div>
             )}
-          </div>
+          </Link>
 
           {/* Collapse / Expand Toggle Button */}
           <button
@@ -70,11 +83,11 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Navigation Section Links with smooth scroll */}
-      <nav className={`flex-1 overflow-y-auto overflow-x-hidden space-y-1.5 py-3 ${isCollapsed ? 'px-2.5' : 'px-3'}`}>
+      {/* Navigation Section Links */}
+      <nav className={`flex-1 overflow-y-auto overflow-x-hidden space-y-1.5 py-3 bg-white ${isCollapsed ? 'px-2.5' : 'px-3'}`}>
         {!isCollapsed && (
           <p className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Navigation
+            Menu
           </p>
         )}
         
@@ -113,7 +126,7 @@ export default function Sidebar({
                 <div className="absolute left-full ml-3.5 px-3 py-1.5 bg-slate-900/95 text-white text-xs font-semibold rounded-xl shadow-xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-150 z-50 flex items-center gap-2">
                   <span>{item.label}</span>
                   {item.badge && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-sky-500 text-white">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-sky-500 text-white">
                       {item.badge}
                     </span>
                   )}
@@ -124,31 +137,31 @@ export default function Sidebar({
         })}
       </nav>
 
-      {/* Sidebar Location & Trust Footer */}
-      <div className="p-3 shrink-0 border-t border-slate-100">
+      {/* Sidebar Location & Trust Score Footer */}
+      <div className="p-3 shrink-0 border-t border-slate-100 bg-white">
         {isCollapsed ? (
-          <div className="flex flex-col items-center gap-2 p-2 rounded-2xl bg-gradient-to-br from-slate-50 to-sky-50/50 border border-slate-200/80 group relative">
+          <div className="flex flex-col items-center gap-1.5 p-2 rounded-2xl bg-gradient-to-br from-slate-50 to-sky-50/50 border border-slate-200/80 group relative">
             <MapPin className="w-4 h-4 text-sky-600" />
             <span className="text-[10px] font-black text-amber-600 flex items-center gap-0.5">
               <Award className="w-3 h-3" /> {trustScore}
             </span>
             {/* Tooltip */}
             <div className="absolute left-full ml-3.5 px-3 py-2 bg-slate-900/95 text-white text-xs rounded-xl shadow-xl whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all z-50">
-              <p className="font-bold">{currentLocation?.name?.split(',')[0] || 'Selected Location'}</p>
-              <p className="text-[10px] text-slate-300">Trust: {trustScore} pts</p>
+              <p className="font-bold">{currentLocation?.name?.split(',')[0] || 'Current City'}</p>
+              <p className="text-[10px] text-slate-300">Community Score: {trustScore} pts</p>
             </div>
           </div>
         ) : (
           <div className="p-3.5 rounded-2xl bg-gradient-to-br from-slate-50 to-sky-50/50 border border-slate-200/80 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase text-slate-400">Selected Location</span>
+              <span className="text-[10px] font-bold uppercase text-slate-400">Current City</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             </div>
             <p className="text-xs font-bold text-slate-800 truncate" title={currentLocation?.name}>
-              {currentLocation?.name || 'Pune (Haveli), Maharashtra'}
+              {currentLocation?.name || 'Pune, Maharashtra'}
             </p>
             <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-500 font-medium">
-              <span>Trust Score:</span>
+              <span>Community Score:</span>
               <span className="font-bold text-amber-600 flex items-center gap-1">
                 <Award className="w-3 h-3" /> {trustScore} Pts
               </span>

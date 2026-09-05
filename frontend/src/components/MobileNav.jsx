@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, Link } from 'react-router-dom'
 import { 
   BarChart3, Calendar, AlertTriangle, Layers, 
   Sparkles, Sprout, Users, TrendingUp, Settings, X, CloudRain, Award
@@ -11,12 +11,12 @@ export default function MobileNav({ isOpen, onClose, currentLocation, trustScore
   const navItems = [
     { to: '/overview', label: 'Overview', icon: BarChart3, badge: 'Live' },
     { to: '/forecast', label: '7-Day Forecast', icon: Calendar },
-    { to: '/alerts', label: 'Alerts & Warnings', icon: AlertTriangle, badge: 'Active', badgeColor: 'bg-amber-100 text-amber-800' },
+    { to: '/alerts', label: 'Weather Alerts', icon: AlertTriangle, badge: 'Active', badgeColor: 'bg-amber-100 text-amber-800' },
     { to: '/maps', label: 'Interactive Maps', icon: Layers },
-    { to: '/chat', label: 'AI Decision Chat', icon: Sparkles, badge: 'AI', badgeColor: 'bg-sky-100 text-sky-700' },
-    { to: '/advisory', label: 'Agriculture & Aviation', icon: Sprout },
-    { to: '/community', label: 'Community Ground Truth', icon: Users },
-    { to: '/climate', label: 'Climate Trends', icon: TrendingUp },
+    { to: '/chat', label: 'Vayu AI Assistant', icon: Sparkles, badge: 'AI', badgeColor: 'bg-sky-100 text-sky-700' },
+    { to: '/advisory', label: 'Farmer & Aviation Guide', icon: Sprout },
+    { to: '/community', label: 'Community Reports', icon: Users },
+    { to: '/climate', label: 'Climate & History', icon: TrendingUp },
     { to: '/settings', label: 'Settings', icon: Settings }
   ]
 
@@ -42,17 +42,26 @@ export default function MobileNav({ isOpen, onClose, currentLocation, trustScore
         
         {/* Drawer Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+          <Link 
+            to="/overview"
+            onClick={() => {
+              onClose()
+              if (location.pathname === '/overview' || location.pathname === '/') {
+                window.location.reload()
+              }
+            }}
+            className="flex items-center gap-2.5"
+          >
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-sm">
               <CloudRain className="w-4 h-4" />
             </div>
             <div>
               <span className="font-extrabold text-sm text-slate-900">WeatherGPT</span>
               <span className="ml-1 text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-sky-50 text-sky-700 border border-sky-200">
-                PRO
+                LIVE
               </span>
             </div>
-          </div>
+          </Link>
           <button 
             onClick={onClose}
             aria-label="Close navigation menu"
@@ -65,7 +74,7 @@ export default function MobileNav({ isOpen, onClose, currentLocation, trustScore
         {/* Links Navigation */}
         <div className="p-3 flex-1 overflow-y-auto">
           <p className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Navigation Menu
+            Menu
           </p>
           <nav className="space-y-1">
             {navItems.map((item) => {
@@ -101,10 +110,10 @@ export default function MobileNav({ isOpen, onClose, currentLocation, trustScore
         {/* Drawer Footer */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/50 space-y-1 text-center">
           <p className="text-xs font-bold text-slate-800 truncate">
-            {currentLocation?.name || 'Selected Location'}
+            {currentLocation?.name || 'Selected City'}
           </p>
           <p className="text-[11px] text-slate-400 font-medium">
-            WeatherGPT Pan-India Meteorological Platform
+            WeatherGPT Smart Weather Platform
           </p>
         </div>
 
