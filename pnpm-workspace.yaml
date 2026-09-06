@@ -1,6 +1,3 @@
-packages:
-  - 'frontend'
-
 allowBuilds:
   '@clerk/shared': true
   esbuild: true

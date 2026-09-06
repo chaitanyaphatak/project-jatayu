@@ -54,20 +54,18 @@ export default function MobileNav({ isOpen, onClose, currentLocation, trustScore
                 window.location.reload()
               }
             }}
-            className="flex items-center gap-2.5"
+            className="flex items-center gap-2"
           >
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20 ring-2 ring-sky-100">
-              <CloudRain className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-base text-slate-900">WeatherGPT</span>
-                <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-sky-50 text-sky-700 border border-sky-200">
-                  LIVE
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 font-medium">Smart Weather Platform</p>
-            </div>
+            <img 
+              src="/jatayu_emblem.png" 
+              alt="Jatayu Logo" 
+              className="h-8 w-8 object-contain drop-shadow-xs shrink-0" 
+            />
+            <img 
+              src="/jatayu_logo.png" 
+              alt="Jatayu" 
+              className="h-6 w-auto max-w-[120px] object-contain drop-shadow-xs" 
+            />
           </Link>
           <button 
             onClick={onClose}
@@ -195,7 +193,7 @@ export default function MobileNav({ isOpen, onClose, currentLocation, trustScore
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium px-1">
-            <span>© 2026 WeatherGPT</span>
+            <span>© 2026 Jatayu Weather Intelligence</span>
             <span className="text-emerald-600 font-bold flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> Live Data
             </span>

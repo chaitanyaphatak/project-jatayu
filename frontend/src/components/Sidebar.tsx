@@ -47,22 +47,23 @@ export default function Sidebar({
             to="/dashboard"
             onClick={handleLogoClick}
             title="Click to go to Dashboard / Refresh"
-            className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
+            className="flex items-center gap-2 min-w-0 cursor-pointer group"
           >
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-sky-500 via-sky-600 to-blue-600 flex items-center justify-center shadow-md shadow-sky-500/20 ring-2 ring-sky-100 shrink-0 group-hover:scale-105 transition-transform">
-              <CloudRain className="w-5 h-5 text-white" />
-            </div>
+            <img 
+              src="/jatayu_emblem.png" 
+              alt="Jatayu Logo" 
+              className="w-7 h-7 object-contain group-hover:scale-105 transition-transform shrink-0" 
+            />
             {!isCollapsed && (
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-base tracking-tight text-slate-900 truncate group-hover:text-sky-600 transition-colors">
-                    WeatherGPT
-                  </span>
-                  <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
-                    PRO
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-400 font-medium truncate">Pan-India Smart Weather</p>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <img 
+                  src="/jatayu_logo.png" 
+                  alt="Jatayu" 
+                  className="h-5 w-auto max-w-[115px] object-contain group-hover:scale-102 transition-transform" 
+                />
+                <span className="text-[7.5px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md shrink-0 bg-gradient-to-r from-amber-400 to-yellow-500 text-amber-950 shadow-sm" style={{letterSpacing: '0.15em'}}>
+                  PRO
+                </span>
               </div>
             )}
           </Link>

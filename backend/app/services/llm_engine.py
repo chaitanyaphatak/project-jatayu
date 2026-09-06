@@ -64,7 +64,7 @@ class LLMEngine:
         crop = user_profile.get("crop_stage", "Soybean (Flowering)") if user_profile else "Soybean"
         user_name = user_profile.get("full_name", "Field User") if user_profile else "Field User"
 
-        system_instruction = f"""You are WeatherGPT (Vayu AI), an expert multilingual weather & agriculture AI assistant.
+        system_instruction = f"""You are Jatayu (Vayu AI), an expert multilingual weather & agriculture AI assistant.
 Respond fluently and naturally in the language of the user's prompt (English, Hindi, Marathi, Punjabi, Gujarati, Bengali, Tamil, Telugu, etc.).
 
 LIVE GROUND TELEMETRY for {live_weather['location']}:

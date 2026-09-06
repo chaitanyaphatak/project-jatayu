@@ -160,7 +160,7 @@ export default function SettingsPage({
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 font-medium truncate">
-                  {user?.primaryEmailAddress?.emailAddress || 'WeatherGPT Member'}
+                  {user?.primaryEmailAddress?.emailAddress || 'Jatayu Member'}
                 </p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
                   {isGoogleUser ? '🔵 Signed in via Google' : '🔐 Email & Password'}
@@ -321,7 +321,7 @@ export default function SettingsPage({
               placeholder="e.g. Flowering & Pod Formation (Soybean)"
             />
             <p className="text-[11px] text-slate-400 mt-1">
-              WeatherGPT adjusts chemical spray windows and fungal alerts based on this specific crop cycle.
+              Jatayu adjusts chemical spray windows and fungal alerts based on this specific crop cycle.
             </p>
           </div>
         </div>

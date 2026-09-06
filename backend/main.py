@@ -43,7 +43,7 @@ async def get_wind_grid_alias():
 @app.get("/")
 def root():
     return {
-        "message": "Welcome to WeatherGPT API",
+        "message": "Welcome to Jatayu API",
         "docs": "/docs",
         "health": "/api/v1/health"
     }

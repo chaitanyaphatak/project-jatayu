@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useUser, useAuth } from '@clerk/clerk-react'
+import { useUser, useAuth, useClerk } from '@clerk/clerk-react'
+import { useIdleTimeout } from './hooks/useIdleTimeout'
+import SessionTimeoutModal from './components/SessionTimeoutModal'
 
 // Layout Components
 import Sidebar from './components/Sidebar'
@@ -25,6 +27,17 @@ import { getCachedWeather, setCachedWeather } from './utils/weatherCache'
 export default function App() {
   const { isSignedIn, user } = useUser()
   const { getToken } = useAuth()
+  const { signOut } = useClerk()
+
+  // ─── Security: Auto-logout after 20 min of inactivity ──────────────────────
+  const handleIdleTimeout = useCallback(async () => {
+    await signOut()
+  }, [signOut])
+
+  const { showWarning, secondsLeft, resetTimer } = useIdleTimeout({
+    onTimeout: handleIdleTimeout,
+    enabled: !!isSignedIn,
+  })
 
   // ─── localStorage helpers ───────────────────────────────────────────────────
   const lsKey = (key: string) => `wgpt_${user?.id || 'guest'}_${key}`
@@ -75,7 +88,7 @@ export default function App() {
   // Desktop Collapsible Sidebar State
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('weathergpt_sidebar_collapsed') === 'true'
+      return localStorage.getItem('jatayu_sidebar_collapsed') === 'true'
     } catch {
       return false
     }
@@ -85,7 +98,7 @@ export default function App() {
     setIsSidebarCollapsed(prev => {
       const next = !prev
       try {
-        localStorage.setItem('weathergpt_sidebar_collapsed', String(next))
+        localStorage.setItem('jatayu_sidebar_collapsed', String(next))
       } catch {}
       return next
     })
@@ -227,28 +240,19 @@ export default function App() {
     }
   }
 
-  // Handle location selection with instant optimistic response and Stale-While-Revalidate caching
+  // Handle location selection with immediate live update
   const handleSelectLocation = (loc: LocationItem) => {
-    // 1. Instantly update location
     setCurrentLocation(loc)
     lsWrite('location', loc)
 
-    // 2. Check instant in-memory cache (0ms instant transition)
+    // Instant local cache swap if available
     const cached = getCachedWeather(loc.lat, loc.lon)
-    if (cached.data) {
-      setWeather(cached.data)
-      setIsWeatherLoading(false)
-      // If stale, silently revalidate in background without blocking UI
-      if (cached.isStale) {
-        fetchLiveWeather(loc.lat, loc.lon, loc.name, true)
-      }
-    } else {
-      // 3. If uncached, show immediate skeleton state and fetch
-      setIsWeatherLoading(true)
-      fetchLiveWeather(loc.lat, loc.lon, loc.name, false)
+    if (cached) {
+      setWeather(cached)
     }
 
-    // Trigger non-blocking alerts and crowd sync
+    // Trigger instant fresh fetch for the new location
+    fetchLiveWeather(loc.lat, loc.lon, loc.name, !!cached)
     fetchLiveAlerts(loc.lat, loc.lon)
     fetchCrowdData(loc.lat, loc.lon)
   }
@@ -322,16 +326,25 @@ export default function App() {
     }
   }
 
+  // Single source-of-truth effect: fires on location (lat/lon) or role/crop change.
+  // Using lat/lon primitives instead of full object reference avoids false triggers
+  // when the same location object is re-created with the same coordinates.
   useEffect(() => {
-    fetchLiveWeather()
-    fetchLiveAlerts()
-    fetchCrowdData()
+    const lat = currentLocation.lat
+    const lon = currentLocation.lon
+    const name = currentLocation.name
+
+    fetchLiveWeather(lat, lon, name, false)
+    fetchLiveAlerts(lat, lon)
+    fetchCrowdData(lat, lon)
+
     const interval = setInterval(() => {
-      fetchLiveWeather()
-      fetchLiveAlerts()
+      fetchLiveWeather(lat, lon, name, true) // silent background refresh
+      fetchLiveAlerts(lat, lon)
     }, 60000)
     return () => clearInterval(interval)
-  }, [currentLocation, userRole, cropStage])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLocation.lat, currentLocation.lon, userRole, cropStage])
 
   // Restore user-specific data on sign-in
   useEffect(() => {
@@ -583,7 +596,7 @@ export default function App() {
 
           {/* Clean App Footer */}
           <footer className="border-t border-slate-200/80 bg-white/70 py-4 px-6 text-center text-xs text-slate-500 font-medium">
-            WeatherGPT &copy; 2026 — Pan-India Hyperlocal Weather Intelligence & Multi-Source Ground Truth Platform.
+            Jatayu &copy; 2026 — Pan-India Hyperlocal Weather Intelligence & Multi-Source Ground Truth Platform.
           </footer>
 
         </div>
@@ -593,6 +606,14 @@ export default function App() {
           isOpen={isReportModalOpen} 
           onClose={() => setIsReportModalOpen(false)} 
           onSubmitReport={handleSubmitReport}
+        />
+
+        {/* Session Timeout Warning Modal (security: auto-logout after 20 min idle) */}
+        <SessionTimeoutModal
+          isOpen={showWarning}
+          secondsLeft={secondsLeft}
+          onStaySignedIn={resetTimer}
+          onSignOut={handleIdleTimeout}
         />
 
       </div>

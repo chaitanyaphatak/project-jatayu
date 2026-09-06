@@ -6,12 +6,36 @@ import {
   Calendar, CheckCircle2, ChevronRight, ChevronDown, ChevronUp, 
   Compass, Zap, SlidersHorizontal, RefreshCw, Sunrise, Sunset, 
   Cpu, Sun, Cloud, CloudSun, CloudRain, CloudLightning, CloudSnow,
-  MapPin, Eye, Bookmark, BookmarkCheck, Lock
+  MapPin, Eye, Bookmark, BookmarkCheck, Lock, TrendingUp, Thermometer, BarChart2
 } from 'lucide-react'
+import {
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar,
+  XAxis, YAxis, Tooltip, CartesianGrid
+} from 'recharts'
 import WeatherMap from '../components/WeatherMap'
 import WeatherBackground from '../components/WeatherBackground'
 import { getWeatherTheme, WEATHER_THEMES, WeatherThemeKey } from '../utils/weatherThemes'
 import { useAuthGate } from '../components/AuthProtectedAction'
+
+// Custom Apple-Styled Tooltip for Recharts
+function CustomAppleChartTooltip({ active, payload, label, unit = '' }: any) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900/90 backdrop-blur-md text-white px-3 py-2 rounded-2xl border border-white/20 shadow-xl text-xs space-y-1">
+        <p className="text-[10px] font-bold text-slate-400 border-b border-white/10 pb-1">{label}</p>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex items-center justify-between gap-3">
+            <span className="text-slate-300 font-medium">{entry.name}:</span>
+            <span className="font-black" style={{ color: entry.color || '#fff' }}>
+              {entry.value}{unit}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return null
+}
 
 export default function OverviewPage({ 
   weather, 
@@ -33,8 +57,10 @@ export default function OverviewPage({
   const [unit, setUnit] = useState<'C' | 'F'>('C')
   const [isSyncing, setIsSyncing] = useState(false)
   const [showSourcesDetail, setShowSourcesDetail] = useState(false)
+  const [showThemePicker, setShowThemePicker] = useState(false)
+  const [overrideTheme, setOverrideTheme] = useState<WeatherThemeKey | null>(null)
   const [selectedDayIndex, setSelectedDayIndex] = useState(0)
-  const [activeMetricTab, setActiveMetricTab] = useState<'aqi' | 'pressure' | 'uv' | 'visibility'>('aqi')
+  const [analyticsMetric, setAnalyticsMetric] = useState<'temp' | 'rain' | 'wind' | 'humidity'>('temp')
   const [forecastData, setForecastData] = useState<any>(null)
   const [currentTimeStr, setCurrentTimeStr] = useState('')
   const [isLocationSaved, setIsLocationSaved] = useState(false)
@@ -80,7 +106,8 @@ export default function OverviewPage({
       try {
         const lat = currentLocation?.lat || 18.5204
         const lon = currentLocation?.lon || 73.8567
-        const res = await fetch(`/api/v1/weather/forecast?lat=${lat}&lon=${lon}&location_name=${encodeURIComponent(currentLocation?.name || '')}`)
+        const locName = currentLocation?.name || ''
+        const res = await fetch(`/api/v1/weather/forecast?lat=${lat}&lon=${lon}&location_name=${encodeURIComponent(locName)}`)
         if (res.ok && isMounted) {
           const data = await res.json()
           setForecastData(data)
@@ -91,7 +118,7 @@ export default function OverviewPage({
     }
     fetchForecast()
     return () => { isMounted = false }
-  }, [currentLocation?.lat, currentLocation?.lon])
+  }, [currentLocation?.lat, currentLocation?.lon, currentLocation?.name])
 
   const handleManualSync = () => {
     if (onRefreshWeather) {
@@ -119,15 +146,13 @@ export default function OverviewPage({
     isDay: weather?.isDay,
   })
 
-  const [overrideTheme, setOverrideTheme] = useState<WeatherThemeKey | null>(null)
-  const [showThemePicker, setShowThemePicker] = useState(false)
-
   React.useEffect(() => {
     setOverrideTheme(null)
   }, [currentLocation?.lat, currentLocation?.lon, currentLocation?.name])
 
   const activeThemeKey = overrideTheme || autoThemeKey
   const activeThemeConfig = WEATHER_THEMES[activeThemeKey]
+  const isDarkTheme = activeThemeConfig.isNight || activeThemeConfig.type === 'night' || activeThemeConfig.type === 'stormy' || activeThemeConfig.type === 'rainy'
 
   // Weekly Days data list
   const dailyList = useMemo(() => {
@@ -144,10 +169,10 @@ export default function OverviewPage({
         } catch {}
         return {
           dayLabel: dayName,
-          tempMax: d.temp_max || (currentTemp + 2 + (idx % 3)),
-          tempMin: d.temp_min || (currentTemp - 5 - (idx % 2)),
+          tempMax: d.temp_max !== undefined ? d.temp_max : (currentTemp + 2 + (idx % 3)),
+          tempMin: d.temp_min !== undefined ? d.temp_min : (currentTemp - 5 - (idx % 2)),
           condition: d.condition || 'Partly cloudy',
-          rainProb: d.rain_prob || (15 + idx * 5),
+          rainProb: d.rain_prob !== undefined ? d.rain_prob : (15 + idx * 5),
           weatherCode: d.weather_code || 2
         }
       })
@@ -165,19 +190,89 @@ export default function OverviewPage({
     ]
   }, [forecastData, currentTemp])
 
-  // Hourly curve points matching the reference screenshot layout
+  // Hourly curve points matching real backend forecast data
   const hourlyData = useMemo(() => {
+    if (forecastData?.hourly && forecastData.hourly.length > 0) {
+      const sampled = []
+      const step = Math.max(1, Math.floor(forecastData.hourly.length / 8))
+      for (let i = 0; i < forecastData.hourly.length && sampled.length < 8; i += step) {
+        const h = forecastData.hourly[i]
+        let timeLabel = h.time || `${i}:00`
+        try {
+          if (h.time && h.time.includes(':')) {
+            const [hoursStr] = h.time.split(':')
+            const hourNum = parseInt(hoursStr, 10)
+            const ampm = hourNum >= 12 ? 'PM' : 'AM'
+            const formattedHour = hourNum % 12 === 0 ? 12 : hourNum % 12
+            timeLabel = `${formattedHour} ${ampm}`
+          }
+        } catch {}
+        sampled.push({
+          time: timeLabel,
+          temp: toUnit(h.temp !== undefined ? h.temp : currentTemp),
+          rain: h.rain_prob !== undefined ? h.rain_prob : 15,
+          isCurrent: sampled.length === 0,
+          condition: h.condition || 'Clear'
+        })
+      }
+      if (sampled.length > 0) return sampled
+    }
+
     return [
-      { time: '5 PM', temp: currentTemp - 1, rain: 19, isCurrent: true },
-      { time: '8 PM', temp: currentTemp - 3, rain: 19 },
-      { time: '11 PM', temp: currentTemp - 4, rain: 3 },
-      { time: '2 AM', temp: currentTemp - 4, rain: 3 },
-      { time: '5 AM', temp: currentTemp - 4, rain: 4 },
-      { time: '8 AM', temp: currentTemp - 3, rain: 4 },
-      { time: '11 AM', temp: currentTemp, rain: 8 },
-      { time: '2 PM', temp: currentTemp + 1, rain: 23 },
+      { time: '5 PM', temp: toUnit(currentTemp - 1), rain: 19, isCurrent: true },
+      { time: '8 PM', temp: toUnit(currentTemp - 3), rain: 19 },
+      { time: '11 PM', temp: toUnit(currentTemp - 4), rain: 3 },
+      { time: '2 AM', temp: toUnit(currentTemp - 4), rain: 3 },
+      { time: '5 AM', temp: toUnit(currentTemp - 4), rain: 4 },
+      { time: '8 AM', temp: toUnit(currentTemp - 3), rain: 4 },
+      { time: '11 AM', temp: toUnit(currentTemp), rain: 8 },
+      { time: '2 PM', temp: toUnit(currentTemp + 1), rain: 23 },
     ]
-  }, [currentTemp])
+  }, [forecastData, currentTemp, unit])
+
+  // Rich 24-hour meteorological dataset for high quality Recharts graphics
+  const hourlyAnalyticsData = useMemo(() => {
+    if (forecastData?.hourly && forecastData.hourly.length > 0) {
+      return forecastData.hourly.slice(0, 24).map((h: any) => {
+        let timeLabel = h.time || '12 PM'
+        try {
+          if (h.time && h.time.includes('T')) {
+            const dateObj = new Date(h.time)
+            timeLabel = dateObj.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
+          }
+        } catch {}
+        const tempC = h.temp ?? currentTemp
+        return {
+          time: timeLabel,
+          temp: toUnit(tempC),
+          dewPoint: toUnit(h.dew_point ?? (tempC - 4)),
+          rainProb: h.rain_prob ?? h.pop ?? (h.precipitation_probability ?? 10),
+          windSpeed: Math.round(h.wind_speed ?? windSpeed),
+          windGust: Math.round((h.wind_speed ?? windSpeed) * 1.45),
+          humidity: Math.round(h.humidity ?? humidity),
+          pressure: Math.round(h.pressure ?? surfacePressure)
+        }
+      })
+    }
+
+    // High-fidelity diurnal synthetic progression fallback matching the location
+    const hours = ['12 AM', '2 AM', '4 AM', '6 AM', '8 AM', '10 AM', '12 PM', '2 PM', '4 PM', '6 PM', '8 PM', '10 PM']
+    const tempDeltas = [-5, -6, -6, -4, -1, 2, 4, 3, 2, 0, -2, -4]
+    const rainDeltas = [5, 4, 3, 4, 8, 12, 18, 24, 20, 15, 10, 6]
+    const windDeltas = [8, 7, 6, 8, 11, 14, 16, 15, 13, 11, 9, 8]
+    const humDeltas = [88, 92, 94, 90, 82, 70, 62, 65, 71, 78, 82, 85]
+
+    return hours.map((hour, idx) => ({
+      time: hour,
+      temp: toUnit(currentTemp + tempDeltas[idx]),
+      dewPoint: toUnit(currentTemp + tempDeltas[idx] - 5),
+      rainProb: rainDeltas[idx],
+      windSpeed: windDeltas[idx],
+      windGust: Math.round(windDeltas[idx] * 1.5),
+      humidity: humDeltas[idx],
+      pressure: surfacePressure + Math.round(Math.sin(idx) * 2)
+    }))
+  }, [forecastData, currentTemp, unit, windSpeed, humidity, surfacePressure])
 
   // High & Low for selected day
   const activeDay = dailyList[selectedDayIndex] || dailyList[0]
@@ -285,7 +380,7 @@ export default function OverviewPage({
       {/* ─── 2. MAIN DASHBOARD GRID ────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
         
-        {/* ─── LEFT HERO CARD (7 COLUMNS) - PRESERVED UI ─── */}
+        {/* ─── LEFT HERO CARD & DIURNAL CHARTS (7 COLUMNS) ─── */}
         <div className="lg:col-span-7 flex flex-col space-y-4">
           <div className="bg-white rounded-3xl border border-slate-200/90 shadow-md overflow-hidden relative transition-all">
             
@@ -296,8 +391,10 @@ export default function OverviewPage({
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-1 truncate">
-                      <MapPin className="w-4 h-4 text-sky-600 shrink-0" />
+                    <h3 className={`text-sm sm:text-base font-extrabold tracking-tight flex items-center gap-1 truncate ${
+                      isDarkTheme ? 'text-white drop-shadow-sm' : 'text-slate-900'
+                    }`}>
+                      <MapPin className="w-4 h-4 text-sky-400 shrink-0" />
                       <span className="truncate">{currentLocation?.name || 'Pune (Haveli), Maharashtra'}</span>
                     </h3>
 
@@ -308,28 +405,36 @@ export default function OverviewPage({
                         setIsLocationSaved(prev => !prev)
                       }, 'Sign in to save favorite agricultural plots & locations')}
                       title={isSignedIn ? (isLocationSaved ? "Saved to your account" : "Save location to account") : "Sign in to save this location"}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition shadow-2xs cursor-pointer ${
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition shadow-2xs cursor-pointer backdrop-blur-md ${
                         isLocationSaved
                           ? 'bg-emerald-600 text-white shadow-xs'
+                          : isDarkTheme
+                          ? 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
                           : 'bg-white/80 hover:bg-white text-slate-700 border border-slate-200/80'
                       }`}
                     >
                       {isLocationSaved ? (
                         <BookmarkCheck className="w-3 h-3 text-white" />
                       ) : (
-                        <Bookmark className="w-3 h-3 text-slate-500" />
+                        <Bookmark className={`w-3 h-3 ${isDarkTheme ? 'text-white/80' : 'text-slate-500'}`} />
                       )}
                       <span>{isLocationSaved ? 'Saved' : 'Save'}</span>
                       {!isSignedIn && (
-                        <Lock className="w-2.5 h-2.5 text-slate-400 ml-0.5 opacity-80" />
+                        <Lock className="w-2.5 h-2.5 ml-0.5 opacity-80" />
                       )}
                     </button>
 
-                    <span className="text-[11px] font-bold text-slate-700 bg-white/75 backdrop-blur-md px-2 py-0.5 rounded-md border border-slate-200/60 shadow-2xs whitespace-nowrap">
+                    <span className={`text-[11px] font-bold backdrop-blur-md px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap border ${
+                      isDarkTheme 
+                        ? 'text-white bg-white/20 border-white/25' 
+                        : 'text-slate-700 bg-white/75 border-slate-200/60'
+                    }`}>
                       {currentTimeStr || '03:40 PM'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  <p className={`text-[11px] font-medium mt-0.5 ${
+                    isDarkTheme ? 'text-slate-300' : 'text-slate-500'
+                  }`}>
                     Updated a few minutes ago
                   </p>
                 </div>
@@ -342,7 +447,7 @@ export default function OverviewPage({
                       type="button"
                       onClick={() => setUnit('F')}
                       className={`px-2 py-0.5 text-xs font-black rounded-lg transition-all cursor-pointer ${
-                        unit === 'F' ? 'bg-slate-700 text-white shadow-2xs' : 'text-slate-300 hover:text-white'
+                        unit === 'F' ? 'bg-sky-500 text-white shadow-2xs' : 'text-slate-300 hover:text-white'
                       }`}
                     >
                       °F
@@ -351,7 +456,7 @@ export default function OverviewPage({
                       type="button"
                       onClick={() => setUnit('C')}
                       className={`px-2 py-0.5 text-xs font-black rounded-lg transition-all cursor-pointer ${
-                        unit === 'C' ? 'bg-slate-700 text-white shadow-2xs' : 'text-slate-300 hover:text-white'
+                        unit === 'C' ? 'bg-sky-500 text-white shadow-2xs' : 'text-slate-300 hover:text-white'
                       }`}
                     >
                       °C
@@ -361,7 +466,11 @@ export default function OverviewPage({
                   {/* Theme Switcher Button */}
                   <button
                     onClick={() => setShowThemePicker(!showThemePicker)}
-                    className="p-1.5 rounded-xl bg-white/80 hover:bg-white text-slate-700 border border-slate-200/80 backdrop-blur-md shadow-2xs transition cursor-pointer"
+                    className={`p-1.5 rounded-xl backdrop-blur-md shadow-2xs transition cursor-pointer border ${
+                      isDarkTheme
+                        ? 'bg-white/15 hover:bg-white/25 text-white border-white/20'
+                        : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200/80'
+                    }`}
                     title="Explore Dynamic Weather Animations"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -401,22 +510,24 @@ export default function OverviewPage({
                       {renderWeatherIcon(weather?.weatherCode, 'w-8 h-8 sm:w-10 sm:h-10')}
                     </div>
 
-                    {/* Large Temp + Condition text (Fused Multi-Source Observation) */}
+                    {/* Large Temp + Condition text */}
                     <div>
                       <div className="flex items-baseline gap-2">
                         <span className={`text-4xl sm:text-5xl font-black tracking-tight ${
-                          activeThemeConfig.isNight || activeThemeConfig.type === 'stormy' ? 'text-white' : 'text-slate-900'
+                          isDarkTheme ? 'text-white drop-shadow-md' : 'text-slate-900'
                         }`}>
                           {toUnit(currentTemp)}°{unit}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <p className={`text-sm sm:text-base font-bold capitalize ${
-                          activeThemeConfig.isNight || activeThemeConfig.type === 'stormy' ? 'text-slate-200' : 'text-slate-800'
+                          isDarkTheme ? 'text-white/90 drop-shadow-sm' : 'text-slate-800'
                         }`}>
                           {weather?.condition || 'Mostly cloudy'}
                         </p>
-                        <span className="text-xs font-semibold text-slate-500">
+                        <span className={`text-xs font-semibold ${
+                          isDarkTheme ? 'text-slate-200' : 'text-slate-500'
+                        }`}>
                           H {highTemp}° L {lowTemp}°
                         </span>
                       </div>
@@ -427,13 +538,13 @@ export default function OverviewPage({
                   <div className="flex items-center gap-1.5">
                     <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-md border shadow-2xs ${
                       confidenceLevel === 'high' 
-                        ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-500/30'
+                        ? isDarkTheme ? 'bg-emerald-950/70 text-emerald-300 border-emerald-400/40' : 'bg-emerald-500/15 text-emerald-800 border-emerald-500/30'
                         : confidenceLevel === 'moderate'
-                        ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30'
-                        : 'bg-rose-500/15 text-rose-800 dark:text-rose-300 border-rose-500/30'
+                        ? isDarkTheme ? 'bg-amber-950/70 text-amber-300 border-amber-400/40' : 'bg-amber-500/15 text-amber-800 border-amber-500/30'
+                        : isDarkTheme ? 'bg-rose-950/70 text-rose-300 border-rose-400/40' : 'bg-rose-500/15 text-rose-800 border-rose-500/30'
                     }`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${
-                        confidenceLevel === 'high' ? 'bg-emerald-500' : confidenceLevel === 'moderate' ? 'bg-amber-500' : 'bg-rose-500'
+                        confidenceLevel === 'high' ? 'bg-emerald-400' : confidenceLevel === 'moderate' ? 'bg-amber-400' : 'bg-rose-400'
                       }`} />
                       {confidenceLabel} ({confidenceSpread <= 2.0 ? '±' + confidenceSpread + '°C' : '±' + confidenceSpread + '°C spread'})
                     </span>
@@ -445,21 +556,25 @@ export default function OverviewPage({
                   <button
                     type="button"
                     onClick={() => setShowSourcesDetail(!showSourcesDetail)}
-                    className="w-full flex items-center justify-between text-left text-xs font-semibold px-3 py-1.5 rounded-xl bg-white/70 hover:bg-white/90 text-slate-700 backdrop-blur-md border border-slate-200/70 shadow-2xs transition-all cursor-pointer group"
+                    className={`w-full flex items-center justify-between text-left text-xs font-semibold px-3 py-1.5 rounded-xl backdrop-blur-md border shadow-2xs transition-all cursor-pointer group ${
+                      isDarkTheme 
+                        ? 'bg-slate-900/60 hover:bg-slate-900/80 text-white border-white/20' 
+                        : 'bg-white/70 hover:bg-white/90 text-slate-700 border-slate-200/70'
+                    }`}
                     title="Click to view raw readings from all meteorological sources"
                   >
                     <div className="flex items-center gap-2 truncate pr-2">
-                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-sky-700 bg-sky-100/80 px-1.5 py-0.5 rounded">
+                      <span className="text-[10px] uppercase tracking-wider font-extrabold text-sky-700 bg-sky-100/90 px-1.5 py-0.5 rounded">
                         Sources ({sourceReadings.filter(s => s.status !== 'excluded_anomaly').length})
                       </span>
-                      <span className="truncate text-slate-600 font-medium text-[11px]">
+                      <span className={`truncate font-medium text-[11px] ${isDarkTheme ? 'text-slate-200' : 'text-slate-600'}`}>
                         {sourceReadings
                           .filter(s => s.status !== 'excluded_anomaly')
                           .map(s => `${s.short_name}: ${toUnit(s.temp)}°${unit}`)
                           .join(' · ')}
                       </span>
                     </div>
-                    <span className="text-sky-600 group-hover:text-sky-700 shrink-0 flex items-center gap-0.5 text-[11px] font-bold">
+                    <span className="text-sky-400 group-hover:text-sky-300 shrink-0 flex items-center gap-0.5 text-[11px] font-bold">
                       {showSourcesDetail ? 'Hide' : 'Details'}
                       {showSourcesDetail ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                     </span>
@@ -513,7 +628,7 @@ export default function OverviewPage({
                       </div>
 
                       <p className="text-[10px] text-slate-500 font-medium leading-normal bg-sky-50/60 p-2 rounded-xl border border-sky-100">
-                        💡 <strong>Ground Truth Accuracy:</strong> Single weather APIs frequently diverge by 1–3°C due to differing physics models and station elevations. SkySense blends ECMWF/GFS physics (0.35), IMD ground radar (0.30), OpenWeatherMap (0.20), and WeatherAPI (0.15) with dynamic anomaly rejection to eliminate skew.
+                        💡 <strong>Ground Truth Accuracy:</strong> ECMWF Physics (0.50), IMD Radar (0.25), OpenWeather (0.15), and WeatherAPI (0.10) with dynamic anomaly rejection.
                       </p>
                     </div>
                   )}
@@ -521,7 +636,7 @@ export default function OverviewPage({
               </div>
 
               {/* ─── 7-DAY WEEKLY FORECAST STRIP ─── */}
-              <div className="pt-2 border-t border-slate-900/10 dark:border-white/15">
+              <div className="pt-2 border-t border-white/20">
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
                   {dailyList.map((day, idx) => {
                     const isSelected = selectedDayIndex === idx
@@ -533,16 +648,26 @@ export default function OverviewPage({
                         className={`p-2 rounded-2xl min-w-[62px] sm:min-w-[68px] text-center transition-all cursor-pointer flex flex-col items-center justify-between shrink-0 border ${
                           isSelected
                             ? 'bg-white text-slate-900 border-sky-400 shadow-md ring-2 ring-sky-300/50 scale-102'
+                            : isDarkTheme
+                            ? 'bg-white/15 hover:bg-white/25 text-white border-white/20 shadow-xs'
                             : 'bg-white/60 hover:bg-white/90 text-slate-700 border-slate-200/60 shadow-2xs'
                         }`}
                       >
-                        <span className="text-[10px] sm:text-[11px] font-extrabold tracking-tight truncate w-full">{day.dayLabel}</span>
+                        <span className={`text-[10px] sm:text-[11px] font-black tracking-tight truncate w-full ${
+                          isSelected ? 'text-slate-900' : isDarkTheme ? 'text-white' : 'text-slate-800'
+                        }`}>
+                          {day.dayLabel}
+                        </span>
                         <div className="my-1 flex items-center justify-center h-6">
                           {renderWeatherIcon(day.weatherCode, 'w-5 h-5')}
                         </div>
                         <div className="flex items-center justify-center gap-1 text-[10px] font-bold">
-                          <span className="text-slate-900">{toUnit(day.tempMax)}°</span>
-                          <span className="text-slate-400 font-normal">{toUnit(day.tempMin)}°</span>
+                          <span className={isSelected ? 'text-slate-900 font-black' : isDarkTheme ? 'text-white font-black' : 'text-slate-900 font-bold'}>
+                            {toUnit(day.tempMax)}°
+                          </span>
+                          <span className={isSelected ? 'text-slate-500' : isDarkTheme ? 'text-slate-300 font-medium' : 'text-slate-400 font-normal'}>
+                            {toUnit(day.tempMin)}°
+                          </span>
                         </div>
                       </button>
                     )
@@ -551,16 +676,20 @@ export default function OverviewPage({
                   {/* Next Arrow link */}
                   <Link
                     to="/forecast"
-                    className="p-2 rounded-2xl bg-white/60 hover:bg-white/90 text-slate-600 border border-slate-200/60 shadow-2xs flex items-center justify-center shrink-0 min-w-[32px] h-[78px]"
+                    className={`p-2 rounded-2xl backdrop-blur-md border shadow-2xs flex items-center justify-center shrink-0 min-w-[32px] h-[78px] transition ${
+                      isDarkTheme 
+                        ? 'bg-white/15 hover:bg-white/25 text-white border-white/20' 
+                        : 'bg-white/60 hover:bg-white/90 text-slate-600 border-slate-200/60'
+                    }`}
                     title="View Full 7-Day Forecast"
                   >
-                    <ChevronRight className="w-4 h-4 text-sky-600" />
+                    <ChevronRight className="w-4 h-4 text-sky-400" />
                   </Link>
                 </div>
               </div>
 
               {/* ─── HOURLY TEMPERATURE & RAIN PROBABILITY CURVE ─── */}
-              <div className="mt-3 pt-2 border-t border-slate-900/10 dark:border-white/15">
+              <div className="mt-3 pt-2 border-t border-white/20">
                 <div className="relative w-full">
                   <svg 
                     viewBox={`0 0 ${chartWidth} ${chartHeight}`} 
@@ -569,17 +698,20 @@ export default function OverviewPage({
                   >
                     <defs>
                       <linearGradient id="curveGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f97316" stopOpacity="0.30" />
-                        <stop offset="60%" stopColor="#fb923c" stopOpacity="0.10" />
+                        <stop offset="0%" stopColor="#f97316" stopOpacity="0.45" />
+                        <stop offset="60%" stopColor="#fb923c" stopOpacity="0.15" />
                         <stop offset="100%" stopColor="#fdba74" stopOpacity="0.0" />
                       </linearGradient>
+                      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#f97316" floodOpacity="0.5"/>
+                      </filter>
                     </defs>
 
                     {/* Gradient Area under curve */}
                     <path d={areaPath} fill="url(#curveGradient)" />
 
                     {/* Smooth Spline Curve Line */}
-                    <path d={curvePath} fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" />
+                    <path d={curvePath} fill="none" stroke="#f97316" strokeWidth="3" strokeLinecap="round" filter="url(#glow)" />
 
                     {/* Current Hour Dotted Vertical Indicator */}
                     {points.filter(p => p.isCurrent).map((p, idx) => (
@@ -589,11 +721,11 @@ export default function OverviewPage({
                           y1={6} 
                           x2={p.x} 
                           y2={chartHeight - 28} 
-                          stroke="#475569" 
-                          strokeWidth="1.2" 
+                          stroke={isDarkTheme ? '#94a3b8' : '#475569'} 
+                          strokeWidth="1.5" 
                           strokeDasharray="3,3" 
                         />
-                        <circle cx={p.x} cy={p.y} r="4" fill="#0f172a" stroke="#ffffff" strokeWidth="2" />
+                        <circle cx={p.x} cy={p.y} r="4.5" fill="#f97316" stroke="#ffffff" strokeWidth="2.5" />
                       </g>
                     ))}
 
@@ -604,7 +736,10 @@ export default function OverviewPage({
                         x={p.x}
                         y={p.y - 7}
                         textAnchor="middle"
-                        className="text-[10px] font-black fill-slate-800 dark:fill-slate-100"
+                        fill={isDarkTheme ? '#ffffff' : '#0f172a'}
+                        fontWeight="900"
+                        fontSize="11"
+                        style={{ filter: isDarkTheme ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.85))' : 'none' }}
                       >
                         {toUnit(p.temp)}°
                       </text>
@@ -617,7 +752,10 @@ export default function OverviewPage({
                           x="0"
                           y="0"
                           textAnchor="middle"
-                          className="text-[10px] font-extrabold fill-sky-600"
+                          fill="#38bdf8"
+                          fontWeight="900"
+                          fontSize="10"
+                          style={{ filter: isDarkTheme ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.7))' : 'none' }}
                         >
                           💧{p.rain}%
                         </text>
@@ -625,7 +763,9 @@ export default function OverviewPage({
                           x="0"
                           y="13"
                           textAnchor="middle"
-                          className="text-[9px] font-bold fill-slate-500"
+                          fill={isDarkTheme ? '#cbd5e1' : '#64748b'}
+                          fontWeight="700"
+                          fontSize="9.5"
                         >
                           {p.time}
                         </text>
@@ -637,380 +777,332 @@ export default function OverviewPage({
 
             </WeatherBackground>
           </div>
+
+          {/* ─── NEW INTERACTIVE RECHARTS ATMOSPHERIC ANALYTICS CARD ─── */}
+          <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-md space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-xs">
+                  <BarChart2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                    Diurnal Dynamics & Analytics
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    24-hour meteorological trends for {currentLocation?.name || 'Local Sector'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Metric Selector Tabs */}
+              <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80">
+                {[
+                  { id: 'temp', label: 'Temp', icon: Thermometer },
+                  { id: 'rain', label: 'Precip', icon: Umbrella },
+                  { id: 'wind', label: 'Wind', icon: Wind },
+                  { id: 'humidity', label: 'Humidity', icon: Droplets }
+                ].map((tab) => {
+                  const Icon = tab.icon
+                  const isActive = analyticsMetric === tab.id
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setAnalyticsMetric(tab.id as any)}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-black flex items-center gap-1 transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-white text-sky-700 shadow-xs ring-1 ring-slate-200/60'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{tab.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Quick Stat Highlights */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="bg-slate-50/90 rounded-2xl p-2.5 border border-slate-200/70">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Peak Temp</span>
+                <p className="text-base font-black text-slate-900 mt-0.5">{highTemp}°{unit}</p>
+                <span className="text-[10px] text-emerald-600 font-bold">2:00 PM Afternoon</span>
+              </div>
+              <div className="bg-slate-50/90 rounded-2xl p-2.5 border border-slate-200/70">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Min Dew Point</span>
+                <p className="text-base font-black text-slate-900 mt-0.5">{lowTemp - 3}°{unit}</p>
+                <span className="text-[10px] text-sky-600 font-bold">5:00 AM Morning</span>
+              </div>
+              <div className="bg-slate-50/90 rounded-2xl p-2.5 border border-slate-200/70">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Max Rain Chance</span>
+                <p className="text-base font-black text-slate-900 mt-0.5">{rainProb}%</p>
+                <span className="text-[10px] text-indigo-600 font-bold">Scattered Shower</span>
+              </div>
+              <div className="bg-slate-50/90 rounded-2xl p-2.5 border border-slate-200/70">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Wind Gusts</span>
+                <p className="text-base font-black text-slate-900 mt-0.5">{Math.round(windSpeed * 1.5)} km/h</p>
+                <span className="text-[10px] text-amber-600 font-bold">Gentle Breeze</span>
+              </div>
+            </div>
+
+            {/* Interactive Recharts Graph */}
+            <div className="h-56 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                {analyticsMetric === 'temp' ? (
+                  <AreaChart data={hourlyAnalyticsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="tempGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="dewGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} unit={`°${unit}`} />
+                    <Tooltip content={<CustomAppleChartTooltip unit={`°${unit}`} />} />
+                    <Area type="monotone" dataKey="temp" name="Temperature" stroke="#f97316" strokeWidth={2.5} fill="url(#tempGradient)" />
+                    <Area type="monotone" dataKey="dewPoint" name="Dew Point" stroke="#38bdf8" strokeWidth={2} strokeDasharray="4 4" fill="url(#dewGradient)" />
+                  </AreaChart>
+                ) : analyticsMetric === 'rain' ? (
+                  <BarChart data={hourlyAnalyticsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
+                    <Tooltip content={<CustomAppleChartTooltip unit="%" />} />
+                    <Bar dataKey="rainProb" name="Precipitation Probability" fill="#0284c7" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                ) : analyticsMetric === 'wind' ? (
+                  <AreaChart data={hourlyAnalyticsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="windGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#0d9488" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#0d9488" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} unit=" km/h" />
+                    <Tooltip content={<CustomAppleChartTooltip unit=" km/h" />} />
+                    <Area type="monotone" dataKey="windGust" name="Wind Gusts" stroke="#14b8a6" strokeWidth={1.5} strokeDasharray="3 3" fill="transparent" />
+                    <Area type="monotone" dataKey="windSpeed" name="Sustained Wind" stroke="#0f766e" strokeWidth={2.5} fill="url(#windGradient)" />
+                  </AreaChart>
+                ) : (
+                  <AreaChart data={hourlyAnalyticsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="humGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" domain={[0, 100]} />
+                    <Tooltip content={<CustomAppleChartTooltip unit="%" />} />
+                    <Area type="monotone" dataKey="humidity" name="Relative Humidity" stroke="#6366f1" strokeWidth={2.5} fill="url(#humGradient)" />
+                  </AreaChart>
+                )}
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
 
         {/* ─── RIGHT 5 COLUMNS: RESTORED ORIGINAL METRIC WIDGETS ─── */}
         <div className="lg:col-span-5 space-y-5">
           
-          {/* ─── INTERACTIVE METRIC TABS: AQI • PRESSURE • UV • VISIBILITY ─── */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-xs space-y-4">
-            
-            {/* Tab Header Selector */}
-            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                <SlidersHorizontal className="w-4 h-4 text-sky-600" />
-                Live Atmospheric Telemetry
-              </span>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
-                Interactive Tabs
+          {/* ─── LIVE ATMOSPHERIC TELEMETRY: APPLE BENTO MATRIX ─── */}
+          <div className="bg-white rounded-3xl p-4.5 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-sky-600" />
+                  Live Atmospheric Telemetry
+                </span>
+              </div>
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                Sensors (4)
               </span>
             </div>
 
-            {/* 4 Tabs Navigation Buttons */}
-            <div className="grid grid-cols-4 gap-1.5 p-1 bg-slate-100/80 rounded-2xl border border-slate-200/80">
-              <button
-                type="button"
-                onClick={() => setActiveMetricTab('aqi')}
-                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
-                  activeMetricTab === 'aqi'
-                    ? 'bg-white text-emerald-800 shadow-xs ring-1 ring-emerald-300 font-black'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                }`}
-              >
-                <Zap className={`w-3.5 h-3.5 ${activeMetricTab === 'aqi' ? 'text-emerald-600' : 'text-slate-400'}`} />
-                <span className="truncate">AQI</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveMetricTab('pressure')}
-                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
-                  activeMetricTab === 'pressure'
-                    ? 'bg-white text-indigo-800 shadow-xs ring-1 ring-indigo-300 font-black'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                }`}
-              >
-                <Gauge className={`w-3.5 h-3.5 ${activeMetricTab === 'pressure' ? 'text-indigo-600' : 'text-slate-400'}`} />
-                <span className="truncate">Pressure</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveMetricTab('uv')}
-                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
-                  activeMetricTab === 'uv'
-                    ? 'bg-white text-amber-800 shadow-xs ring-1 ring-amber-300 font-black'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                }`}
-              >
-                <Sun className={`w-3.5 h-3.5 ${activeMetricTab === 'uv' ? 'text-amber-600' : 'text-slate-400'}`} />
-                <span className="truncate">UV Index</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveMetricTab('visibility')}
-                className={`py-2 px-1 rounded-xl text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1 cursor-pointer ${
-                  activeMetricTab === 'visibility'
-                    ? 'bg-white text-sky-800 shadow-xs ring-1 ring-sky-300 font-black'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                }`}
-              >
-                <Eye className={`w-3.5 h-3.5 ${activeMetricTab === 'visibility' ? 'text-sky-600' : 'text-slate-400'}`} />
-                <span className="truncate">Visibility</span>
-              </button>
-            </div>
-
-            {/* TAB CONTENT PANELS */}
-            
-            {/* 1. AIR QUALITY (AQI) TAB */}
-            {activeMetricTab === 'aqi' && (
-              <div className="space-y-3.5 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-11 h-11 rounded-2xl bg-emerald-100/90 text-emerald-800 flex items-center justify-center font-black text-lg shadow-2xs">
-                      {aqi}
-                    </div>
-                    <div>
-                      <p className="text-xs font-extrabold text-slate-900">
-                        {aqi <= 50 ? 'Good & Clean Air Quality' : aqi <= 100 ? 'Moderate Air Quality' : 'Sensitive Air Quality'}
-                      </p>
-                      <p className="text-[11px] text-emerald-700 font-semibold">
-                        {aqi <= 50 ? '🌿 Minimal health impact' : '⚠️ Mild respiratory caution'}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                    AQI {aqi}
+            {/* 4 Apple-Style Telemetry Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              
+              {/* 1. AIR QUALITY (AQI) CARD */}
+              <div className="bg-slate-50/80 hover:bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between space-y-2.5 transition-all">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5 truncate">
+                    <Zap className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    Air Quality
+                  </span>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${
+                    aqi <= 50 ? 'bg-emerald-100 text-emerald-800' :
+                    aqi <= 100 ? 'bg-amber-100 text-amber-800' :
+                    'bg-rose-100 text-rose-800'
+                  }`}>
+                    {aqi <= 50 ? 'Good' : aqi <= 100 ? 'Moderate' : 'Unhealthy'}
                   </span>
                 </div>
 
-                {/* AQI Gradient Spectrum Bar */}
+                <div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{aqi}</span>
+                    <span className="text-[11px] font-bold text-slate-400">AQI</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-medium mt-0.5 truncate">
+                    {aqi <= 50 ? 'Clean & satisfactory air.' : aqi <= 100 ? 'Acceptable air quality.' : 'Sensitive precaution advised.'}
+                  </p>
+                </div>
+
+                {/* AQI Spectrum Bar */}
                 <div className="space-y-1">
-                  <div className="h-2 w-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 relative">
+                  <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 relative">
                     <div 
-                      className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md border-2 border-slate-900"
+                      className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white shadow-sm border border-slate-900"
                       style={{ left: `${Math.min(95, Math.max(5, (aqi / 200) * 100))}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold px-0.5">
-                    <span className="text-emerald-600">0 Good</span>
-                    <span className="text-amber-600">50 Moderate</span>
-                    <span className="text-orange-600">100 Unhealthy</span>
-                    <span className="text-rose-600">200+</span>
-                  </div>
                 </div>
 
-                {/* Pollutant Micro-grid */}
-                <div className="grid grid-cols-4 gap-1.5 pt-1">
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/70 text-center">
-                    <p className="text-[9px] text-slate-400 font-bold">PM2.5</p>
-                    <p className="text-xs font-black text-slate-800">{Math.round(aqi * 0.65)}</p>
-                    <p className="text-[8px] text-emerald-600 font-semibold">µg/m³</p>
-                  </div>
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/70 text-center">
-                    <p className="text-[9px] text-slate-400 font-bold">PM10</p>
-                    <p className="text-xs font-black text-slate-800">{Math.round(aqi * 0.95)}</p>
-                    <p className="text-[8px] text-emerald-600 font-semibold">µg/m³</p>
-                  </div>
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/70 text-center">
-                    <p className="text-[9px] text-slate-400 font-bold">NO₂</p>
-                    <p className="text-xs font-black text-slate-800">14.2</p>
-                    <p className="text-[8px] text-slate-500 font-semibold">ppb</p>
-                  </div>
-                  <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/70 text-center">
-                    <p className="text-[9px] text-slate-400 font-bold">O₃</p>
-                    <p className="text-xs font-black text-slate-800">22.8</p>
-                    <p className="text-[8px] text-slate-500 font-semibold">ppb</p>
-                  </div>
-                </div>
-
-                {/* Sun Daylight Times */}
-                <div className="p-2.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5 text-amber-900 font-semibold">
-                    <Sunrise className="w-4 h-4 text-amber-600" />
-                    <span>Sunrise: <strong>6:14 AM</strong></span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-amber-900 font-semibold">
-                    <Sunset className="w-4 h-4 text-amber-600" />
-                    <span>Sunset: <strong>6:48 PM</strong></span>
-                  </div>
+                {/* Pollutant tags */}
+                <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500 pt-1 border-t border-slate-200/60">
+                  <span>PM2.5: <strong className="text-slate-800 font-black">{Math.round(aqi * 0.45)}</strong></span>
+                  <span>PM10: <strong className="text-slate-800 font-black">{Math.round(aqi * 0.75)}</strong></span>
                 </div>
               </div>
-            )}
 
-            {/* 2. SURFACE PRESSURE TAB */}
-            {activeMetricTab === 'pressure' && (
-              <div className="space-y-3.5 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-11 h-11 rounded-2xl bg-indigo-100/90 text-indigo-800 flex items-center justify-center font-black text-base shadow-2xs">
-                      <Gauge className="w-6 h-6 text-indigo-700" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-extrabold text-slate-900">
-                        {surfacePressure} hPa (mbar)
-                      </p>
-                      <p className="text-[11px] text-indigo-700 font-semibold">
-                        {surfacePressure >= 1010 ? 'High pressure — stable dry layer' : surfacePressure >= 1000 ? 'Normal barometric equilibrium' : 'Low pressure — convective activity'}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                    {surfacePressure >= 1005 ? 'Stable' : 'Unstable'}
+              {/* 2. SURFACE PRESSURE CARD */}
+              <div className="bg-slate-50/80 hover:bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between space-y-2.5 transition-all">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5 truncate">
+                    <Gauge className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    Pressure
+                  </span>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 shrink-0">
+                    {surfacePressure >= 1008 ? 'Stable' : 'Low'}
                   </span>
                 </div>
 
-                {/* Pressure Gauge Range Bar */}
+                <div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{surfacePressure}</span>
+                    <span className="text-[11px] font-bold text-slate-400">hPa</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-medium mt-0.5 truncate">
+                    {surfacePressure >= 1012 ? 'High pressure • Clear skies' : surfacePressure >= 1005 ? 'Standard barometric level' : 'Low pressure • Clouds'}
+                  </p>
+                </div>
+
+                {/* Pressure Bar */}
                 <div className="space-y-1">
-                  <div className="h-2 w-full rounded-full bg-gradient-to-r from-rose-400 via-sky-400 to-indigo-600 relative">
+                  <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-rose-400 via-sky-400 to-indigo-600 relative">
                     <div 
-                      className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md border-2 border-slate-900"
+                      className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white shadow-sm border border-slate-900"
                       style={{ left: `${Math.min(95, Math.max(5, ((surfacePressure - 980) / 60) * 100))}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold px-0.5">
-                    <span className="text-rose-600">980 hPa (Storm)</span>
-                    <span className="text-sky-600">1013 hPa (Std)</span>
-                    <span className="text-indigo-600">1040 hPa (High)</span>
-                  </div>
                 </div>
 
-                {/* Meteorological Interpretation */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Barometric Trend</span>
-                    <p className="font-extrabold text-slate-800 mt-0.5">Steady (+0.2 hPa / 3h)</p>
-                    <p className="text-[10px] text-slate-500">No squall risk</p>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Sea-Level Norm</span>
-                    <p className="font-extrabold text-slate-800 mt-0.5">1013.2 hPa</p>
-                    <p className="text-[10px] text-slate-500">Alt Adjusted</p>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-200 text-xs text-indigo-900 font-medium leading-relaxed">
-                  ⏱️ <strong>Atmospheric Density:</strong> {surfacePressure} hPa pressure indicates stable air mass across the sector with negligible turbulence updrafts.
+                {/* Pressure tags */}
+                <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500 pt-1 border-t border-slate-200/60">
+                  <span>Norm: <strong className="text-slate-800 font-black">MSLP QNH</strong></span>
+                  <span>Trend: <strong className="text-emerald-700 font-black">Steady</strong></span>
                 </div>
               </div>
-            )}
 
-            {/* 3. UV INDEX TAB */}
-            {activeMetricTab === 'uv' && (
-              <div className="space-y-3.5 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-11 h-11 rounded-2xl bg-amber-100/90 text-amber-800 flex items-center justify-center font-black text-lg shadow-2xs">
-                      {uvIndex}
-                    </div>
-                    <div>
-                      <p className="text-xs font-extrabold text-slate-900">
-                        {uvIndex <= 2.9 ? 'Low UV Radiation' : uvIndex <= 5.9 ? 'Moderate Solar UV' : uvIndex <= 7.9 ? 'High UV Index' : 'Very High UV Index'}
-                      </p>
-                      <p className="text-[11px] text-amber-700 font-semibold">
-                        {uvIndex >= 6.0 ? '☀️ Sun protection recommended' : '🌤️ Safe solar exposure'}
-                      </p>
-                    </div>
-                  </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    uvIndex >= 8 ? 'bg-rose-100 text-rose-800' : uvIndex >= 6 ? 'bg-orange-100 text-orange-800' : 'bg-amber-100 text-amber-800'
+              {/* 3. UV INDEX CARD */}
+              <div className="bg-slate-50/80 hover:bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between space-y-2.5 transition-all">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5 truncate">
+                    <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    UV Index
+                  </span>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${
+                    uvIndex <= 2.9 ? 'bg-emerald-100 text-emerald-800' :
+                    uvIndex <= 5.9 ? 'bg-amber-100 text-amber-800' :
+                    'bg-purple-100 text-purple-800'
                   }`}>
-                    UV {uvIndex}
+                    {uvIndex <= 2.9 ? 'Low' : uvIndex <= 5.9 ? 'Moderate' : 'High'}
                   </span>
                 </div>
 
-                {/* UV Index Spectrum Bar */}
+                <div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{uvIndex}</span>
+                    <span className="text-[11px] font-bold text-slate-400">/ 12</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-medium mt-0.5 truncate">
+                    {uvIndex <= 2.9 ? 'Low solar exposure today.' : uvIndex <= 5.9 ? 'Sunglasses recommended.' : 'High solar flux • Seek shade.'}
+                  </p>
+                </div>
+
+                {/* UV Bar */}
                 <div className="space-y-1">
-                  <div className="h-2 w-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-400 via-orange-500 to-purple-600 relative">
+                  <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-400 via-orange-500 to-purple-600 relative">
                     <div 
-                      className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md border-2 border-slate-900"
+                      className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white shadow-sm border border-slate-900"
                       style={{ left: `${Math.min(95, Math.max(5, (uvIndex / 12) * 100))}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold px-0.5">
-                    <span className="text-emerald-600">0-2 Low</span>
-                    <span className="text-amber-600">3-5 Mod</span>
-                    <span className="text-orange-600">6-7 High</span>
-                    <span className="text-purple-600">8-11+ Extreme</span>
-                  </div>
                 </div>
 
-                {/* Solar Exposure Timing Grid */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Peak UV Window</span>
-                    <p className="font-extrabold text-slate-800 mt-0.5">11:00 AM – 3:30 PM</p>
-                    <p className="text-[10px] text-amber-700 font-semibold">Max solar flux</p>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Solar Radiation</span>
-                    <p className="font-extrabold text-slate-800 mt-0.5">~640 W/m²</p>
-                    <p className="text-[10px] text-slate-500">Global Horizontal</p>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 font-medium leading-relaxed">
-                  🛡️ <strong>Farmer Advisory:</strong> Wear wide-brim headgear & apply SPF 30+ sun protection during midday agricultural work.
+                {/* UV tags */}
+                <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500 pt-1 border-t border-slate-200/60">
+                  <span>Peak: <strong className="text-slate-800 font-black">11 AM - 3 PM</strong></span>
+                  <span>Sun: <strong className={uvIndex >= 6 ? 'text-amber-700 font-black' : 'text-emerald-700 font-black'}>{uvIndex >= 6 ? 'Shield' : 'Safe'}</strong></span>
                 </div>
               </div>
-            )}
 
-            {/* 4. VISIBILITY TAB */}
-            {activeMetricTab === 'visibility' && (
-              <div className="space-y-3.5 animate-in fade-in duration-150">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-11 h-11 rounded-2xl bg-sky-100/90 text-sky-800 flex items-center justify-center font-black text-base shadow-2xs">
-                      <Eye className="w-6 h-6 text-sky-700" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-extrabold text-slate-900">
-                        {visibility} km ({Math.round(visibility * 1000)} meters)
-                      </p>
-                      <p className="text-[11px] text-sky-700 font-semibold">
-                        {visibility >= 10.0 ? '🔭 Crystal clear horizon scope' : visibility >= 5.0 ? 'Mild mist / good visibility' : '⚠️ Fog warning / reduced visibility'}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800">
-                    {visibility >= 10 ? 'Optimal' : 'Moderate'}
+              {/* 4. VISIBILITY CARD */}
+              <div className="bg-slate-50/80 hover:bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 flex flex-col justify-between space-y-2.5 transition-all">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5 truncate">
+                    <Eye className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                    Visibility
+                  </span>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 shrink-0">
+                    {visibility >= 10 ? 'Clear' : 'Moderate'}
                   </span>
                 </div>
 
-                {/* Visibility Range Bar */}
+                <div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{visibility}</span>
+                    <span className="text-[11px] font-bold text-slate-400">km</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-medium mt-0.5 truncate">
+                    {visibility >= 10 ? 'Crystal clear horizon view.' : visibility >= 5 ? 'Light mist present.' : 'Fog warning • Reduced scope.'}
+                  </p>
+                </div>
+
+                {/* Visibility Bar */}
                 <div className="space-y-1">
-                  <div className="h-2 w-full rounded-full bg-gradient-to-r from-rose-400 via-amber-400 via-sky-400 to-emerald-500 relative">
+                  <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-rose-400 via-amber-400 via-sky-400 to-emerald-500 relative">
                     <div 
-                      className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md border-2 border-slate-900"
+                      className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-white shadow-sm border border-slate-900"
                       style={{ left: `${Math.min(95, Math.max(5, (visibility / 10) * 100))}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold px-0.5">
-                    <span className="text-rose-600">&lt;1 km (Fog)</span>
-                    <span className="text-amber-600">4 km (Mist)</span>
-                    <span className="text-sky-600">8 km (Haze)</span>
-                    <span className="text-emerald-600">10+ km (Clear)</span>
-                  </div>
                 </div>
 
-                {/* Operations & Highway Grid */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Aviation / Drone</span>
-                    <p className="font-extrabold text-slate-800 mt-0.5">VFR Unrestricted</p>
-                    <p className="text-[10px] text-emerald-600 font-semibold">Flight Clear</p>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase">Highway / Road</span>
-                    <p className="font-extrabold text-slate-800 mt-0.5">Safe Transit</p>
-                    <p className="text-[10px] text-emerald-600 font-semibold">No Fog Hazard</p>
-                  </div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-sky-50/70 border border-sky-200 text-xs text-sky-900 font-medium leading-relaxed">
-                  👁️ <strong>Atmospheric Clarity:</strong> Dew point spread of +3.4°C prevents ground radiation fog formation across surrounding roadways and valleys.
+                {/* Visibility tags */}
+                <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500 pt-1 border-t border-slate-200/60">
+                  <span>Scope: <strong className="text-slate-800 font-black">{Math.round(visibility * 1000)}m</strong></span>
+                  <span>Fog: <strong className="text-emerald-700 font-black">None</strong></span>
                 </div>
               </div>
-            )}
 
-            {/* Bottom 4-Metric Quick Glance Selector Strip */}
-            <div className="pt-2 border-t border-slate-100 grid grid-cols-4 gap-1.5 text-center">
-              <button
-                type="button"
-                onClick={() => setActiveMetricTab('aqi')}
-                className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
-                  activeMetricTab === 'aqi' ? 'bg-emerald-50 border-emerald-300 shadow-2xs' : 'bg-slate-50/70 hover:bg-slate-100 border-slate-200/60'
-                }`}
-              >
-                <p className="text-[9px] text-slate-400 font-bold">AQI</p>
-                <p className="text-[11px] font-black text-emerald-700">{aqi}</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveMetricTab('pressure')}
-                className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
-                  activeMetricTab === 'pressure' ? 'bg-indigo-50 border-indigo-300 shadow-2xs' : 'bg-slate-50/70 hover:bg-slate-100 border-slate-200/60'
-                }`}
-              >
-                <p className="text-[9px] text-slate-400 font-bold">Pressure</p>
-                <p className="text-[11px] font-black text-indigo-700">{surfacePressure}</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveMetricTab('uv')}
-                className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
-                  activeMetricTab === 'uv' ? 'bg-amber-50 border-amber-300 shadow-2xs' : 'bg-slate-50/70 hover:bg-slate-100 border-slate-200/60'
-                }`}
-              >
-                <p className="text-[9px] text-slate-400 font-bold">UV</p>
-                <p className="text-[11px] font-black text-amber-700">{uvIndex}</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveMetricTab('visibility')}
-                className={`p-1.5 rounded-xl border transition-all cursor-pointer ${
-                  activeMetricTab === 'visibility' ? 'bg-sky-50 border-sky-300 shadow-2xs' : 'bg-slate-50/70 hover:bg-slate-100 border-slate-200/60'
-                }`}
-              >
-                <p className="text-[9px] text-slate-400 font-bold">Visibility</p>
-                <p className="text-[11px] font-black text-sky-700">{visibility}km</p>
-              </button>
             </div>
-
           </div>
 
           {/* Farm Spraying & Outdoor Guide */}

@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: weathergpt-backend
+    name: jatayu-backend
     env: python
     region: singapore
     plan: free
@@ -11,7 +11,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: CORS_ORIGINS
-        value: https://weathergpt.vercel.app,http://localhost:5173
+        value: https://jatayu.vercel.app,http://localhost:5173
       - key: CLERK_PUBLISHABLE_KEY
         sync: false
       - key: CLERK_SECRET_KEY

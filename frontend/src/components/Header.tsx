@@ -80,12 +80,18 @@ export default function Header({
                 window.location.reload()
               }
             }}
-            className="flex items-center gap-1 font-black text-slate-900 text-xs sm:text-sm shrink-0"
+            className="flex items-center gap-1.5 shrink-0 group py-0.5"
           >
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center text-white shadow-2xs">
-              <CloudRain className="w-4 h-4" />
-            </div>
-            <span className="hidden md:inline">WeatherGPT</span>
+            <img 
+              src="/jatayu_emblem.png" 
+              alt="Jatayu Logo" 
+              className="h-6 w-6 sm:h-7 sm:w-7 object-contain group-hover:scale-105 transition-transform" 
+            />
+            <img 
+              src="/jatayu_logo.png" 
+              alt="Jatayu" 
+              className="h-5 sm:h-6 w-auto object-contain hidden sm:inline group-hover:scale-102 transition-transform" 
+            />
           </Link>
         </div>
 
@@ -212,7 +218,7 @@ export default function Header({
                         {user?.fullName || user?.firstName || 'Logged in User'}
                       </p>
                       <p className="text-[11px] text-slate-500 truncate">
-                        {user?.primaryEmailAddress?.emailAddress || 'WeatherGPT Member'}
+                        {user?.primaryEmailAddress?.emailAddress || 'Jatayu Member'}
                       </p>
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded mt-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active

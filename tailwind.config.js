@@ -1,11 +1,22 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
+    "./frontend/index.html",
+    "./frontend/src/**/*.{js,ts,jsx,tsx}",
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Outfit', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        display: ['Outfit', 'system-ui', 'sans-serif'],
+        body: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
+      letterSpacing: {
+        tighter: '-0.02em',
+      },
       colors: {
         brand: {
           50: '#f0f9ff',

@@ -66,7 +66,7 @@ async def sync_clerk_user(payload: ProfileUpdateRequest, user_data: Dict[str, An
     profile_payload = {
         "clerk_user_id": user_id,
         "email": user_data.get("email"),
-        "full_name": payload.full_name or "WeatherGPT User",
+        "full_name": payload.full_name or "Jatayu User",
         "role": payload.role or "citizen",
         "occupation": payload.occupation,
         "crop_stage": payload.crop_stage,

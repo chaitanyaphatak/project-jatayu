@@ -1,2 +1,2 @@
-"""WeatherGPT Backend Application Package"""
+"""Jatayu Backend Application Package"""
 __version__ = "0.1.0"

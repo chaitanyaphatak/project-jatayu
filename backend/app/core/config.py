@@ -3,7 +3,7 @@ from typing import List
 import os
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "WeatherGPT API"
+    PROJECT_NAME: str = "Jatayu API"
     VERSION: str = "0.1.0"
     ENVIRONMENT: str = "development"
     PORT: int = 8000

@@ -67,13 +67,13 @@ def verify_clerk_token(credentials: Optional[HTTPAuthorizationCredentials] = Sec
             unverified = jwt.decode(token, options={"verify_signature": False})
             return {
                 "user_id": unverified.get("sub", "dev_user_001"),
-                "email": unverified.get("email", "dev@weathergpt.local"),
+                "email": unverified.get("email", "dev@jatayu.local"),
                 "claims": unverified
             }
         except Exception:
             return {
                 "user_id": "dev_user_001",
-                "email": "dev@weathergpt.local",
+                "email": "dev@jatayu.local",
                 "claims": {"role": "developer"}
             }
 

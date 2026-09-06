@@ -64,7 +64,7 @@ async def query_weather_intelligence(
         if db_profile:
             profile = db_profile
         else:
-            profile["full_name"] = user_data.get("claims", {}).get("name", "WeatherGPT Member")
+            profile["full_name"] = user_data.get("claims", {}).get("name", "Jatayu Member")
     
     # Allow request override if user switched persona tab in frontend
     if payload.role_override:
