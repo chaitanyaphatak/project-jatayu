@@ -83,3 +83,56 @@ async def evaluate_proactive_alert(
         "telemetry_snapshot": weather,
         "proactive_message": msg
     }
+
+class AlertSubscriptionRequest(BaseModel):
+    location_name: str
+    latitude: float
+    longitude: float
+    channel: str = "sms"  # sms, whatsapp, push
+    phone_number: Optional[str] = None
+    alert_types: List[str] = ["heavy_rain", "frost", "heatwave", "storm"]
+
+# In-memory user alert subscriptions registry
+_user_alert_subscriptions: Dict[str, List[Dict[str, Any]]] = {}
+
+@router.post("/subscribe")
+async def subscribe_to_proactive_alerts(
+    payload: AlertSubscriptionRequest,
+    user_data: Dict[str, Any] = Depends(verify_clerk_token)
+):
+    """
+    PROTECTED: Registers an SMS/WhatsApp proactive alert subscription strictly for verified users.
+    """
+    user_id = user_data["user_id"]
+    sub_item = {
+        "id": str(uuid.uuid4()),
+        "clerk_user_id": user_id,
+        "location_name": payload.location_name,
+        "latitude": payload.latitude,
+        "longitude": payload.longitude,
+        "channel": payload.channel,
+        "phone_number": payload.phone_number or user_data.get("claims", {}).get("phone_number", "+91 98765 43210"),
+        "alert_types": payload.alert_types,
+        "is_active": True,
+        "subscribed_at": datetime.utcnow().isoformat()
+    }
+
+    if user_id not in _user_alert_subscriptions:
+        _user_alert_subscriptions[user_id] = []
+    _user_alert_subscriptions[user_id].append(sub_item)
+
+    return {
+        "status": "active",
+        "subscription_id": sub_item["id"],
+        "message": f"Successfully subscribed to {payload.channel.upper()} alerts for {payload.location_name}."
+    }
+
+@router.get("/subscriptions")
+async def get_user_alert_subscriptions(
+    user_data: Dict[str, Any] = Depends(verify_clerk_token)
+):
+    """
+    PROTECTED: Retrieves active alert subscriptions for the authenticated Clerk user.
+    """
+    user_id = user_data["user_id"]
+    return _user_alert_subscriptions.get(user_id, [])

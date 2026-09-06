@@ -17,7 +17,7 @@ export default function Sidebar({
   const location = useLocation()
 
   const navItems = [
-    { to: '/overview', label: 'Dashboard', icon: BarChart3, badge: 'Live' },
+    { to: '/dashboard', label: 'Dashboard', icon: BarChart3, badge: 'Live' },
     { to: '/forecast', label: '7-Day Forecast', icon: Calendar },
     { to: '/alerts', label: 'Weather Alerts', icon: AlertTriangle, badge: 'Active', badgeColor: 'bg-amber-100 text-amber-800' },
     { to: '/maps', label: 'Interactive Maps & Radar', icon: Layers },
@@ -29,7 +29,7 @@ export default function Sidebar({
   ]
 
   const handleLogoClick = () => {
-    if (location.pathname === '/overview' || location.pathname === '/') {
+    if (location.pathname === '/dashboard' || location.pathname === '/overview' || location.pathname === '/') {
       window.location.reload()
     }
   }
@@ -44,9 +44,9 @@ export default function Sidebar({
       <div className="border-b border-slate-100 shrink-0 bg-white">
         <div className={`p-3.5 flex items-center ${isCollapsed ? 'flex-col gap-3 justify-center' : 'justify-between gap-3'}`}>
           <Link 
-            to="/overview"
+            to="/dashboard"
             onClick={handleLogoClick}
-            title="Click to go to Overview / Refresh"
+            title="Click to go to Dashboard / Refresh"
             className="flex items-center gap-2.5 min-w-0 cursor-pointer group"
           >
             <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-sky-500 via-sky-600 to-blue-600 flex items-center justify-center shadow-md shadow-sky-500/20 ring-2 ring-sky-100 shrink-0 group-hover:scale-105 transition-transform">
@@ -94,7 +94,8 @@ export default function Sidebar({
         
         {navItems.map((item) => {
           const Icon = item.icon
-          const isActive = location.pathname === item.to || (item.to === '/overview' && location.pathname === '/')
+          const isActive = location.pathname === item.to || 
+            ((item.to === '/dashboard' || item.to === '/overview') && (location.pathname === '/' || location.pathname === '/overview' || location.pathname === '/dashboard'))
 
           return (
             <NavLink

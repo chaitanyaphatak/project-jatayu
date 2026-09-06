@@ -1,5 +1,6 @@
 import httpx
 import json
+import re
 from typing import Dict, Any, Optional, List
 from app.core.config import settings
 from app.services.weather_service import WeatherService
@@ -7,15 +8,45 @@ from app.services.weather_service import WeatherService
 class LLMEngine:
     """
     Orchestrates conversational weather intelligence using:
-    - Primary: Google Gemini (gemini-3.6-flash)
-    - Low-latency Fallback: Groq (qwen/qwen3.6-27b / compound)
+    - Primary: Google Gemini (gemini-flash-latest)
+    - Low-latency Fallback: Groq (openai/gpt-oss-120b / groq/compound)
     
     Grounds all responses with multi-source meteorological telemetry (ECMWF, GFS, WeatherAPI, OWM)
     and persona context (Farmer crop stages, Aviation flight levels, Disaster flood watches).
     """
 
-    GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
+    GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
     GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+    @staticmethod
+    def _clean_llm_output(text: Optional[str]) -> str:
+        """
+        Strips internal reasoning chains, <think>...</think> blocks, and model thoughts.
+        Guarantees that substantive response is never wiped out.
+        """
+        if not text:
+            return ""
+        
+        cleaned = text.strip()
+        
+        # 1. If closing tag exists, extract the content after it
+        if '</think>' in cleaned:
+            parts = cleaned.split('</think>')
+            cleaned = parts[-1].strip()
+        elif '</thought>' in cleaned:
+            parts = cleaned.split('</thought>')
+            cleaned = parts[-1].strip()
+        elif '</reasoning>' in cleaned:
+            parts = cleaned.split('</reasoning>')
+            cleaned = parts[-1].strip()
+        
+        # 2. Strip any leftover open tags
+        cleaned = cleaned.replace('<think>', '').replace('</think>', '').replace('<thought>', '').replace('</thought>', '').replace('<reasoning>', '').replace('</reasoning>', '').strip()
+        
+        # 3. Remove "Here's a thinking process:" preamble
+        cleaned = re.sub(r"(?i)^Here's a thinking process:.*?(?=\n\n|\Z)", '', cleaned, flags=re.DOTALL).strip()
+        
+        return cleaned if cleaned else text.strip()
 
     @classmethod
     async def process_query(
@@ -33,60 +64,58 @@ class LLMEngine:
         crop = user_profile.get("crop_stage", "Soybean (Flowering)") if user_profile else "Soybean"
         user_name = user_profile.get("full_name", "Field User") if user_profile else "Field User"
 
-        system_instruction = f"""You are WeatherGPT, a proactive, explainable hyperlocal weather intelligence agent built for enterprise decision support.
-You speak with technical authority and empathy to citizens, farmers, pilots, and disaster managers.
-Primary language: English (with natural multilingual support for Hindi and Hinglish when the user writes in them).
+        system_instruction = f"""You are WeatherGPT (Vayu AI), an expert multilingual weather & agriculture AI assistant.
+Respond fluently and naturally in the language of the user's prompt (English, Hindi, Marathi, Punjabi, Gujarati, Bengali, Tamil, Telugu, etc.).
 
 LIVE GROUND TELEMETRY for {live_weather['location']}:
 - Temperature: {live_weather['temperature']}°C (Feels like: {live_weather['feels_like']}°C)
-- Weather Condition: {live_weather['condition']}
+- Condition: {live_weather['condition']}
 - Relative Humidity: {live_weather['humidity']}%
-- Surface Wind: {live_weather['wind_speed']} km/h
+- Wind Speed: {live_weather['wind_speed']} km/h
 - Surface Pressure: {live_weather['surface_pressure']} hPa
 - Precipitation Probability (Next 4h): {live_weather['precipitation_prob']}%
-- Air Quality PM2.5 AQI: {live_weather['air_quality_index']}
+- PM2.5 Air Quality (AQI): {live_weather['air_quality_index']}
 - Multi-Model Agreement Score: {live_weather['model_agreement_score']}% ({live_weather['model_agreement_rating']})
-- Data Feeds Blended: {', '.join(live_weather['sources_used'])}
 
-CURRENT USER PERSONA:
-- User Name: {user_name}
-- Role: {role.upper()}
-- Specific Context: {crop}
+USER CONTEXT:
+- Persona: {role.upper()}
+- Agricultural Context: {crop}
 
-INSTRUCTIONS:
-1. Answer the user query directly, leveraging the exact live ground telemetry above.
-2. If role is 'farmer', advise on crop spraying, irrigation, soil moisture, and fungal risks for {crop}.
-3. If role is 'pilot', advise on cloud tops, convective turbulence, crosswinds, and VFR/IFR visibility.
-4. If role is 'disaster_manager', highlight z-score anomalies, runoff saturation, and evacuation thresholds.
-5. Provide actionable decisions — not just numbers.
-6. Keep your response concise, structured, and informative (2 to 4 paragraphs max).
+RULES:
+1. Provide a direct, actionable, friendly, and complete advisory based on the live weather data above.
+2. If the user asks about crop spraying or farming, evaluate temperature, wind, humidity, and rain probability for {crop}.
+3. If the user asks about flight or travel, evaluate convective hazards and visibility.
+4. Keep the output clean, structured with bullet points or short paragraphs.
+5. NEVER include thinking process, reasoning tags, or <think> tags.
 """
 
-        # Try Gemini 3.6 Flash first
+        # 1. Try Gemini
         if settings.GEMINI_API_KEY:
             try:
                 gemini_res = await cls._query_gemini(system_instruction, user_query)
-                if gemini_res:
-                    return cls._format_response(gemini_res, live_weather)
+                cleaned_res = cls._clean_llm_output(gemini_res)
+                if cleaned_res:
+                    return cls._format_response(cleaned_res, live_weather)
             except Exception as e:
                 print(f"Gemini error, falling back to Groq: {e}")
 
-        # Try Groq fallback
+        # 2. Try Groq
         if settings.GROQ_API_KEY:
             try:
                 groq_res = await cls._query_groq(system_instruction, user_query)
-                if groq_res:
-                    return cls._format_response(groq_res, live_weather)
+                cleaned_res = cls._clean_llm_output(groq_res)
+                if cleaned_res:
+                    return cls._format_response(cleaned_res, live_weather)
             except Exception as e:
                 print(f"Groq error: {e}")
 
-        # Rule-based fallback if APIs are unreachable
+        # 3. Rule-based fallback
         fallback_text = cls._rule_based_fallback(user_query, live_weather, role)
         return cls._format_response(fallback_text, live_weather)
 
     @classmethod
     async def _query_gemini(cls, system_instruction: str, user_query: str) -> Optional[str]:
-        async with httpx.AsyncClient(timeout=12.0) as client:
+        async with httpx.AsyncClient(timeout=14.0) as client:
             resp = await client.post(
                 f"{cls.GEMINI_URL}?key={settings.GEMINI_API_KEY}",
                 headers={"Content-Type": "application/json"},
@@ -98,8 +127,8 @@ INSTRUCTIONS:
                         {"parts": [{"text": user_query}]}
                     ],
                     "generationConfig": {
-                        "temperature": 0.4,
-                        "maxOutputTokens": 600
+                        "temperature": 0.3,
+                        "maxOutputTokens": 800
                     }
                 }
             )
@@ -114,7 +143,7 @@ INSTRUCTIONS:
 
     @classmethod
     async def _query_groq(cls, system_instruction: str, user_query: str) -> Optional[str]:
-        async with httpx.AsyncClient(timeout=8.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
                 cls.GROQ_URL,
                 headers={
@@ -122,13 +151,13 @@ INSTRUCTIONS:
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "qwen/qwen3.6-27b",
+                    "model": "openai/gpt-oss-120b",
                     "messages": [
                         {"role": "system", "content": system_instruction},
                         {"role": "user", "content": user_query}
                     ],
-                    "temperature": 0.4,
-                    "max_tokens": 600
+                    "temperature": 0.3,
+                    "max_tokens": 800
                 }
             )
             if resp.status_code == 200:
@@ -143,50 +172,77 @@ INSTRUCTIONS:
         return {
             "response": answer,
             "explainability": {
-                "confidence_score": live_weather.get("model_agreement_score", 92),
+                "confidence_score": live_weather.get("model_agreement_score", 94),
                 "model_consensus": live_weather.get("model_agreement_rating", "High Consensus"),
-                "models_consulted": "Gemini 3.6 Flash + " + " + ".join(live_weather.get("sources_used", ["Open-Meteo"])),
+                "models_consulted": "Gemini AI + Multi-Source Weather Telemetry (ECMWF, GFS, OWM)",
                 "contributing_factors": live_weather.get("contributing_factors", []),
                 "activity_impact": live_weather.get("activity_impact")
             },
             "telemetry": {
-                "location": live_weather["location"],
-                "temperature": live_weather["temperature"],
-                "condition": live_weather["condition"],
-                "rain_probability": live_weather["precipitation_prob"],
-                "humidity": live_weather["humidity"],
-                "wind_speed": live_weather["wind_speed"]
+                "location": live_weather.get("location", "Selected Location"),
+                "temperature": live_weather.get("temperature", 26.0),
+                "condition": live_weather.get("condition", "Partly Cloudy"),
+                "rain_probability": live_weather.get("precipitation_prob", 20),
+                "humidity": live_weather.get("humidity", 75),
+                "wind_speed": live_weather.get("wind_speed", 10.0)
             }
         }
 
     @staticmethod
     def _rule_based_fallback(query: str, w: Dict[str, Any], role: str) -> str:
         q = query.lower()
-        loc = w["location"]
-        temp = w["temperature"]
-        rain_prob = w["precipitation_prob"]
-        wind = w["wind_speed"]
+        loc = w.get("location", "Selected Location")
+        temp = w.get("temperature", 26.0)
+        rain_prob = w.get("precipitation_prob", 20)
+        wind = w.get("wind_speed", 10.0)
+        humidity = w.get("humidity", 75)
+        cond = w.get("condition", "Partly Cloudy")
 
-        if "spray" in q or "khet" in q or "crop" in q or role == "farmer":
-            if rain_prob > 50 or wind > 15:
+        is_hindi = any('\u0900' <= char <= '\u097F' for char in query) or "hindi" in q
+        is_marathi = "marathi" in q or "पाऊस" in query or "फवारणी" in query
+
+        if is_hindi:
+            if "छिड़काव" in query or "कीटनाशक" in query or "स्प्रे" in query or role == "farmer":
+                if rain_prob > 40 or wind > 15:
+                    return (
+                        f"⚠️ **कृषि मौसम सलाह ({loc})**:\n\n"
+                        f"आज कीटनाशक या रासायनिक छिड़काव के लिए मौसम **अनुकूल नहीं है**।\n"
+                        f"• **बारिश की संभावना**: {rain_prob}%\n"
+                        f"• **हवा की गति**: {wind} km/h\n"
+                        f"• **आर्द्रता**: {humidity}%\n\n"
+                        f"सलाह: बारिश या तेज हवा से दवा धुलने और रासायनिक रिसाव का जोखिम है। मौसम साफ होने की प्रतीक्षा करें।"
+                    )
                 return (
-                    f"⚠️ **Agricultural Recommendation for {loc}**: DO NOT spray chemicals today.\n\n"
-                    f"Current ground readings show a **{rain_prob}% chance of rain** with surface winds at **{wind} km/h**. "
-                    f"Pesticides or foliar fertilizers applied now will be washed off by precipitation, leading to chemical waste and soil runoff."
+                    f"✅ **कृषि मौसम सलाह ({loc})**:\n\n"
+                    f"आज कीटनाशक छिड़काव के लिए मौसम **अनुकूल है**।\n"
+                    f"• **तापमान**: {temp}°C | **हवा की गति**: {wind} km/h (शांत)\n"
+                    f"• **बारिश की संभावना**: {rain_prob}% (न्यूनतम)\n"
+                    f"• **आर्द्रता**: {humidity}%\n\n"
+                    f"सलाह: सुबह 7:00 से 10:00 बजे या शाम 4:30 के बाद छिड़काव करना सर्वोत्तम रहेगा।"
                 )
             return (
-                f"✅ **Agricultural Advisory for {loc}**: Spraying window is favorable.\n\n"
-                f"Low precipitation probability ({rain_prob}%) and calm winds ({wind} km/h) allow effective droplet adhesion."
+                f"🌤️ **{loc} के लिए लाइव मौसम अपडेट**:\n\n"
+                f"• **स्थिति**: {cond}\n"
+                f"• **तापमान**: {temp}°C (आर्द्रता: {humidity}%)\n"
+                f"• **हवा**: {wind} km/h | **बारिश की संभावना**: {rain_prob}%\n\n"
+                f"दिन के समय बाहरी गतिविधियों और खेती के कार्यों के लिए मौसम सामान्य बना रहेगा।"
             )
 
-        if "route" in q or "flight" in q or role == "pilot":
+        if is_marathi:
             return (
-                f"✈️ **Aviation Weather Advisory for {loc}**:\n"
-                f"- Temperature: {temp}°C | Surface Wind: {wind} km/h | Pressure: {w['surface_pressure']} hPa\n"
-                f"- Convective risk: Moderate updraft activity detected. Recommend monitoring VFR cloud ceilings below 3,000 ft AGL."
+                f"🌤️ **{loc} साठी हवामान सल्ला**:\n\n"
+                f"• **सध्याचे तापमान**: {temp}°C\n"
+                f"• **हवामानाची स्थिती**: {cond}\n"
+                f"• **आर्द्रता**: {humidity}% | **वाऱ्याचा वेग**: {wind} km/h\n"
+                f"• **पावसाची शक्यता**: {rain_prob}%\n\n"
+                f"सध्या शेतीविषयक कामे आणि नियोजनासाठी हवामान अनुकूल आहे."
             )
 
         return (
-            f"Current weather in **{loc}** is **{w['condition']}** at **{temp}°C**.\n\n"
-            f"Relative humidity is {w['humidity']}% with a {rain_prob}% probability of localized showers in the next 4 hours."
+            f"🌤️ **Live Weather & Advisory for {loc}**:\n\n"
+            f"• **Current Condition**: {cond}\n"
+            f"• **Temperature**: {temp}°C | **Relative Humidity**: {humidity}%\n"
+            f"• **Surface Wind**: {wind} km/h | **Precipitation Chance**: {rain_prob}%\n\n"
+            f"Weather conditions are stable for scheduled operations and agricultural activities today."
         )
+

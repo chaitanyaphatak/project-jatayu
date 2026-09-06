@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { SignedIn, SignedOut, SignInButton, useUser, useClerk } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignInButton, SignUpButton, useUser, useClerk } from '@clerk/clerk-react'
 import { 
   AlertTriangle, Sprout, Plane, Flame, Building2, 
-  PlusCircle, LogIn, Menu, CloudRain, CheckCircle2, 
+  PlusCircle, LogIn, UserPlus, Menu, CloudRain, CheckCircle2, 
   ChevronDown, User, LogOut, Settings, Plus
 } from 'lucide-react'
 import IndiaSearchBar from './IndiaSearchBar'
+
+import { useAuthGate } from './AuthProtectedAction'
 
 export default function Header({ 
   currentLocation, 
@@ -19,7 +21,7 @@ export default function Header({
   trustScore,
   onToggleMobileMenu
 }) {
-  const { user } = useUser()
+  const { user, isSignedIn, executeGuarded } = useAuthGate()
   const { openUserProfile, signOut } = useClerk()
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const userMenuRef = useRef(null)
@@ -72,9 +74,9 @@ export default function Header({
             <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <Link 
-            to="/overview" 
+            to="/dashboard" 
             onClick={() => {
-              if (window.location.pathname === '/' || window.location.pathname === '/overview') {
+              if (window.location.pathname === '/' || window.location.pathname === '/overview' || window.location.pathname === '/dashboard') {
                 window.location.reload()
               }
             }}
@@ -135,14 +137,19 @@ export default function Header({
             </button>
           </div>
 
-          {/* Submit Ground Report Button: Icon on Mobile, Full on Tablet/PC */}
+          {/* Submit Ground Report Button: Protected with Clerk Auth */}
           <button
-            onClick={onOpenReportModal}
-            title="Report Local Weather"
+            onClick={() => executeGuarded(onOpenReportModal, 'Sign in to submit ground weather reports')}
+            title={isSignedIn ? "Report Local Weather" : "Sign in to report local weather"}
             className="p-1.5 sm:px-3 sm:py-1.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1.5 transition shadow-2xs cursor-pointer shrink-0"
           >
             <PlusCircle className="w-4 h-4 text-amber-600 shrink-0" />
             <span className="hidden sm:inline">Report</span>
+            {!isSignedIn && (
+              <span className="hidden md:inline-flex items-center text-[9px] font-black uppercase px-1 py-0.2 rounded bg-amber-200/80 text-amber-900 ml-0.5">
+                Auth
+              </span>
+            )}
           </button>
 
           {/* Clerk Auth Pill: Compact on Mobile, Full on PC */}
@@ -249,15 +256,29 @@ export default function Header({
           </SignedIn>
 
           <SignedOut>
-            <SignInButton mode="modal" afterSignInUrl="/overview" afterSignUpUrl="/overview">
-              <button
-                id="header-signin-btn"
-                className="px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">Sign In</span>
-              </button>
-            </SignInButton>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <SignInButton mode="modal" fallbackRedirectUrl="/overview">
+                <button
+                  id="header-signin-btn"
+                  className="px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200/80 flex items-center gap-1 shadow-2xs transition cursor-pointer shrink-0"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden sm:inline">Sign In</span>
+                  <span className="sm:hidden">Login</span>
+                </button>
+              </SignInButton>
+
+              <SignUpButton mode="modal" fallbackRedirectUrl="/overview">
+                <button
+                  id="header-signup-btn"
+                  className="px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-600 via-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white flex items-center gap-1 shadow-xs transition cursor-pointer shrink-0"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Sign Up</span>
+                  <span className="sm:hidden">Join</span>
+                </button>
+              </SignUpButton>
+            </div>
           </SignedOut>
 
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Search, MapPin, Navigation, Sparkles, X, ChevronRight, Loader2 } from 'lucide-react'
+import { Search, MapPin, Navigation, Sparkles, X, ChevronRight, Loader2, Compass } from 'lucide-react'
 import { INDIA_LOCATIONS, searchIndiaLocations } from '../data/indiaLocations'
 
 export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDetectLocation }) {
@@ -11,7 +11,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
   const dropdownRef = useRef(null)
   const debounceTimerRef = useRef(null)
 
-  // Universal Pan-India Village, Town & City Geocoder
+  // Universal Pan-India Village, Town & City Geocoder with Multi-Source Fallback
   useEffect(() => {
     if (!query || query.trim().length === 0) {
       setSuggestions([])
@@ -21,8 +21,15 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
 
     const trimmed = query.trim()
 
-    // 1. First check instant local presets
-    const localMatches = searchIndiaLocations(trimmed, 6)
+    // 1. First check instant local curated database
+    const localMatches = searchIndiaLocations(trimmed, 8).map(loc => ({
+      ...loc,
+      placeName: loc.name.split(/[(,]/)[0].trim(),
+      district: loc.name.includes('Pune') ? 'Pune District' : (loc.name.includes('Wardha') ? 'Wardha District' : loc.state),
+      displayName: loc.name,
+      source: 'curated'
+    }))
+
     if (localMatches.length > 0) {
       setSuggestions(localMatches)
       setIsOpen(true)
@@ -33,86 +40,93 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
 
     debounceTimerRef.current = setTimeout(async () => {
       try {
-        const results = []
+        const fetchedResults = []
 
-        // 2. Open-Meteo High Speed Geocoding (Global + Indian Villages/Towns)
-        try {
-          const omRes = await fetch(
-            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(trimmed)}&count=10&language=en&format=json`
-          )
-          if (omRes.ok) {
-            const omData = await omRes.json()
+        // Concurrently query both Open-Meteo & Photon OSM Geocoders for maximum precision
+        const [omRes, photonRes] = await Promise.allSettled([
+          fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(trimmed)}&count=10&language=en&format=json`),
+          fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(trimmed + ' India')}&limit=10`)
+        ])
+
+        // Parse Photon OSM (Unmatched granularity for Indian Gram Panchayats, Villages & Subdistricts)
+        if (photonRes.status === 'fulfilled' && photonRes.value.ok) {
+          try {
+            const photonData = await photonRes.value.json()
+            if (photonData.features && photonData.features.length > 0) {
+              photonData.features.forEach((f) => {
+                const props = f.properties || {}
+                const name = props.name || trimmed
+                const state = props.state || 'Maharashtra'
+                const county = props.county || props.district || props.city || ''
+                const district = props.district || props.county || county || state
+                const coords = f.geometry?.coordinates || []
+                
+                if (coords.length >= 2) {
+                  const subdistrictTag = county && county !== name ? ` (${county})` : ''
+                  fetchedResults.push({
+                    name: `${name}${subdistrictTag}, ${state}`,
+                    displayName: [name, county, state, 'India'].filter(Boolean).join(', '),
+                    placeName: name,
+                    subdistrict: county,
+                    district: district,
+                    state: state,
+                    lat: parseFloat(parseFloat(coords[1]).toFixed(4)),
+                    lon: parseFloat(parseFloat(coords[0]).toFixed(4)),
+                    type: props.osm_value === 'village' || props.type === 'village' 
+                      ? 'Village / Gram Panchayat' 
+                      : (props.type === 'city' ? 'City' : 'Town / Tehsil'),
+                    crop: 'Regional Agriculture',
+                    risk: 'Hyperlocal Micro-climate',
+                    source: 'osm'
+                  })
+                }
+              })
+            }
+          } catch (e) {
+            console.warn('Photon parse notice:', e)
+          }
+        }
+
+        // Parse Open-Meteo (High Accuracy NWP Geocoding)
+        if (omRes.status === 'fulfilled' && omRes.value.ok) {
+          try {
+            const omData = await omRes.value.json()
             if (omData.results && omData.results.length > 0) {
               omData.results.forEach((item) => {
                 const admin1 = item.admin1 || ''
                 const admin2 = item.admin2 || ''
+                const admin3 = item.admin3 || ''
                 const country = item.country || 'India'
-                const fullDesc = [admin2, admin1, country].filter(Boolean).join(', ')
+                const districtTag = admin2 ? ` (${admin2}${admin3 ? ' / ' + admin3 : ''})` : ''
 
-                results.push({
-                  name: `${item.name}, ${admin1 || country}`,
-                  displayName: `${item.name}, ${fullDesc}`,
+                fetchedResults.push({
+                  name: `${item.name}${districtTag}, ${admin1 || country}`,
+                  displayName: [item.name, admin3, admin2, admin1, country].filter(Boolean).join(', '),
                   placeName: item.name,
+                  subdistrict: admin3,
                   district: admin2 || admin1,
                   state: admin1 || 'India',
-                  lat: parseFloat(item.latitude),
-                  lon: parseFloat(item.longitude),
-                  type: item.feature_code?.includes('PPL') ? 'Village / Town' : 'City / Settlement',
+                  lat: parseFloat(parseFloat(item.latitude).toFixed(4)),
+                  lon: parseFloat(parseFloat(item.longitude).toFixed(4)),
+                  type: item.feature_code?.includes('PPL') ? 'Village / Settlement' : 'City / Metro',
                   crop: 'Regional Crops',
-                  risk: 'Live Micro-climate'
+                  risk: 'Live Micro-climate',
+                  source: 'open-meteo'
                 })
               })
             }
-          }
-        } catch (e) {
-          console.warn('OpenMeteo geocode fallback:', e)
-        }
-
-        // 3. Photon OSM Geocoding (Comprehensive Indian Gram Panchayats & Localities)
-        if (results.length < 5) {
-          try {
-            const photonRes = await fetch(
-              `https://photon.komoot.io/api/?q=${encodeURIComponent(trimmed + ' India')}&limit=10`
-            )
-            if (photonRes.ok) {
-              const photonData = await photonRes.json()
-              if (photonData.features && photonData.features.length > 0) {
-                photonData.features.forEach((f) => {
-                  const props = f.properties || {}
-                  const name = props.name || trimmed
-                  const state = props.state || 'Maharashtra'
-                  const district = props.county || props.city || props.district || ''
-                  const coords = f.geometry?.coordinates || []
-                  
-                  if (coords.length >= 2) {
-                    results.push({
-                      name: `${name}, ${state}`,
-                      displayName: [name, district, state, 'India'].filter(Boolean).join(', '),
-                      placeName: name,
-                      district: district,
-                      state: state,
-                      lat: parseFloat(coords[1]),
-                      lon: parseFloat(coords[0]),
-                      type: props.type === 'village' ? 'Village (Gram Panchayat)' : (props.type === 'city' ? 'City' : 'Town / Tehsil'),
-                      crop: 'Regional Agriculture',
-                      risk: 'Active Micro-climate'
-                    })
-                  }
-                })
-              }
-            }
           } catch (e) {
-            console.warn('Photon geocode fallback:', e)
+            console.warn('Open-Meteo parse notice:', e)
           }
         }
 
-        // Combine with local presets and de-duplicate
-        const combined = [...localMatches, ...results]
+        // Merge, de-duplicate, and rank
+        const combined = [...localMatches, ...fetchedResults]
         const unique = []
         const seen = new Set()
 
         for (const item of combined) {
-          const key = `${item.name.toLowerCase()}_${item.lat.toFixed(2)}_${item.lon.toFixed(2)}`
+          const key = `${item.placeName.toLowerCase()}_${item.lat.toFixed(2)}_${item.lon.toFixed(2)}`
           if (!seen.has(key)) {
             seen.add(key)
             unique.push(item)
@@ -133,7 +147,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
       } finally {
         setLoading(false)
       }
-    }, 250)
+    }, 200)
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
@@ -165,11 +179,12 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
               const data = await res.json()
               const props = data.features?.[0]?.properties || {}
               const place = props.name || props.city || props.district || 'My Location'
+              const district = props.county || props.district || ''
               const state = props.state || 'India'
               
               onSelectLocation({
-                name: `${place}, ${state}`,
-                displayName: `${place}, ${props.county || ''}, ${state}`,
+                name: `${place}${district ? ` (${district})` : ''}, ${state}`,
+                displayName: `${place}, ${district}, ${state}`,
                 state: state,
                 lat: lat,
                 lon: lon,
@@ -190,7 +205,8 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
         () => {
           setLoading(false)
           alert('GPS location permission denied. Please search your village or city in the search bar.')
-        }
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
       )
     }
   }
@@ -212,7 +228,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
           value={query}
           onFocus={() => setIsOpen(true)}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search any village, tehsil, city (e.g. Bhugaon, Pune, Jaipur)..."
+          placeholder="Search village, tehsil, city (e.g. Bhugaon, Pune, Wardha)..."
           className="w-full bg-transparent outline-none text-xs md:text-sm text-slate-800 placeholder-slate-400 font-medium py-1"
         />
 
@@ -231,29 +247,29 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
         <button
           type="button"
           onClick={handleGPSDetect}
-          title="Detect Exact Village/City GPS"
-          className="px-2 py-1 rounded-xl bg-white hover:bg-sky-50 text-sky-700 text-xs font-bold flex items-center gap-1 border border-slate-200 hover:border-sky-300 transition shrink-0 shadow-xs cursor-pointer"
+          title="Detect Exact Village/City GPS Coordinates"
+          className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-sky-50 to-blue-50 hover:from-sky-100 hover:to-blue-100 text-sky-700 text-xs font-bold flex items-center gap-1.5 border border-sky-200 transition shrink-0 shadow-2xs cursor-pointer active:scale-95"
         >
-          <Navigation className="w-3 h-3 text-sky-600" />
-          <span className="hidden sm:inline">GPS</span>
+          <Navigation className="w-3.5 h-3.5 text-sky-600 animate-pulse" />
+          <span className="hidden sm:inline">GPS Auto-Detect</span>
         </button>
       </div>
 
       {/* Auto-Recommendations Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-900/10 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[420px] flex flex-col">
+        <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-xl shadow-slate-900/10 overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[440px] flex flex-col">
           
           {/* Category Quick Filter Chips */}
           <div className="p-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] font-bold">
             <span className="text-slate-400 uppercase tracking-wider text-[10px] mr-1 shrink-0">
-              Popular:
+              Explore:
             </span>
             {[
               { id: 'All', label: 'All India' },
               { id: 'Agri-Hub', label: '🌾 Rural & Agri' },
+              { id: 'Ghat Fringe', label: '⛰️ Pune / Mulshi Villages' },
               { id: 'Metro', label: 'Metros' },
               { id: 'Hill Station', label: '🏔️ Hill Stations' },
-              { id: 'Coastal', label: '🌊 Coastal' }
             ].map((cat) => (
               <button
                 key={cat.id}
@@ -271,7 +287,7 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
           </div>
 
           {/* Results List */}
-          <div className="overflow-y-auto flex-1 p-2 space-y-1 divide-y divide-slate-100">
+          <div className="overflow-y-auto flex-1 p-2 space-y-1.5 divide-y divide-slate-100">
             {suggestions.length > 0 ? (
               suggestions.map((loc, idx) => (
                 <button
@@ -282,38 +298,49 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
                     setQuery('')
                     setIsOpen(false)
                   }}
-                  className="w-full text-left p-2.5 rounded-xl hover:bg-sky-50/80 transition flex items-center justify-between group cursor-pointer"
+                  className="w-full text-left p-2.5 rounded-xl hover:bg-sky-50/80 transition flex items-center justify-between group cursor-pointer border border-transparent hover:border-sky-200"
                 >
-                  <div className="flex items-start gap-2.5">
+                  <div className="flex items-start gap-2.5 min-w-0">
                     <div className="p-1.5 bg-sky-100 text-sky-700 rounded-lg group-hover:bg-sky-200 transition mt-0.5 shrink-0">
-                      <MapPin className="w-3.5 h-3.5" />
+                      <MapPin className="w-4 h-4" />
                     </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-900 group-hover:text-sky-900">
-                        {loc.name}
-                      </p>
-                      <p className="text-[11px] text-slate-500 font-medium">
-                        {loc.displayName || `${loc.district ? loc.district + ', ' : ''}${loc.state}`}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-xs font-bold text-slate-900 group-hover:text-sky-950">
+                          {loc.placeName || loc.name}
+                        </p>
+                        {/* Distinct District / Subdistrict Disambiguation Badge */}
+                        {(loc.subdistrict || loc.district || loc.state) && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/80">
+                            {loc.subdistrict ? `${loc.subdistrict}, ` : ''}{loc.district || loc.state}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                        {loc.displayName || `${loc.state}, India`} • <span className="text-slate-400 font-mono text-[10px]">{loc.lat.toFixed(2)}°N, {loc.lon.toFixed(2)}°E</span>
                       </p>
                       {loc.crop && (
-                        <p className="text-[10px] text-emerald-700 font-semibold">
-                          🌾 Dominant Crop: {loc.crop}
+                        <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                          🌾 Crop: {loc.crop}
                         </p>
                       )}
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200 shrink-0">
-                    {loc.type}
-                  </span>
+                  
+                  <div className="shrink-0 text-right ml-2">
+                    <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-1 rounded-lg border border-sky-200 inline-block">
+                      {loc.type || 'Village / Town'}
+                    </span>
+                  </div>
                 </button>
               ))
             ) : query.trim().length > 0 && !loading ? (
               <div className="p-6 text-center space-y-2">
                 <p className="text-xs text-slate-600">
-                  Searching live database for <strong>"{query}"</strong>...
+                  Searching live nationwide geocoding database for <strong>"{query}"</strong>...
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  Try entering village or tehsil name with state (e.g. "{query}, Maharashtra").
+                  Try typing your village or taluka name with state (e.g. "{query}, Maharashtra").
                 </p>
               </div>
             ) : (
@@ -347,11 +374,13 @@ export default function IndiaSearchBar({ currentLocation, onSelectLocation, onDe
           </div>
 
           {/* Footer Info */}
-          <div className="p-2 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-400 text-center font-medium">
-            Pan-India High-Resolution Village & City Geocoding Active
+          <div className="p-2 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-500 text-center font-medium flex items-center justify-center gap-1.5">
+            <Compass className="w-3 h-3 text-sky-600" />
+            <span>High-Resolution Multi-Model Tri-Fusion Radar & Weather Telemetry Active</span>
           </div>
         </div>
       )}
     </div>
   )
 }
+

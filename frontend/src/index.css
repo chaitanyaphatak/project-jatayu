@@ -117,3 +117,105 @@
 .cl-userButtonPopoverMain {
   padding: 8px !important;
 }
+
+/* ─── DYNAMIC WEATHER BACKGROUND KEYFRAMES ──────────────────────────────── */
+@keyframes sunGlowPulse {
+  0% {
+    transform: scale(0.95) rotate(0deg);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.08) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.02) rotate(-2deg);
+    opacity: 0.85;
+  }
+}
+
+@keyframes moonGlow {
+  0% {
+    transform: scale(0.96);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes cloudDriftSlow {
+  0% {
+    transform: translateX(-15%);
+  }
+  50% {
+    transform: translateX(10%);
+  }
+  100% {
+    transform: translateX(-15%);
+  }
+}
+
+@keyframes cloudDriftMid {
+  0% {
+    transform: translateX(-10%);
+  }
+  50% {
+    transform: translateX(15%);
+  }
+  100% {
+    transform: translateX(-10%);
+  }
+}
+
+@keyframes cloudDriftFast {
+  0% {
+    transform: translateX(-8%);
+  }
+  50% {
+    transform: translateX(20%);
+  }
+  100% {
+    transform: translateX(-8%);
+  }
+}
+
+@keyframes fogWave {
+  0% {
+    transform: translateX(-8%) scaleY(0.95);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateX(8%) scaleY(1.05);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(-8%) scaleY(0.95);
+    opacity: 0.6;
+  }
+}
+
+@keyframes lightningFlash {
+  0%, 91%, 95%, 100% {
+    opacity: 0;
+  }
+  92% {
+    opacity: 0.85;
+  }
+  93% {
+    opacity: 0.15;
+  }
+  94% {
+    opacity: 0.95;
+  }
+}
+
+/* Accessibility Reduced Motion Override */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

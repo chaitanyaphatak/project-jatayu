@@ -24,24 +24,28 @@ class SavedLocationResponse(SavedLocationCreate):
 async def get_current_weather(
     lat: float = Query(18.5204, description="Latitude"),
     lon: float = Query(73.8567, description="Longitude"),
-    location_name: Optional[str] = Query("Haveli, Pune", description="Optional location label")
+    location_name: Optional[str] = Query(None, description="Optional location label"),
+    location: Optional[str] = Query(None, description="Optional location label alias")
 ):
     """
     Ingests live meteorological data from Open-Meteo, WeatherAPI, and OpenWeatherMap.
     """
-    data = await WeatherService.get_current_weather(lat, lon, location_name)
+    loc = location_name or location or "Local Area"
+    data = await WeatherService.get_current_weather(lat, lon, loc)
     return data
 
 @router.get("/forecast")
 async def get_weather_forecast(
     lat: float = Query(18.5204, description="Latitude"),
     lon: float = Query(73.8567, description="Longitude"),
-    location_name: Optional[str] = Query("Haveli, Pune", description="Optional location label")
+    location_name: Optional[str] = Query(None, description="Optional location label"),
+    location: Optional[str] = Query(None, description="Optional location label alias")
 ):
     """
     Provides 7-day multi-day daily and 24-hour hourly meteorological progression.
     """
-    data = await WeatherService.get_detailed_forecast(lat, lon, location_name)
+    loc = location_name or location or "Local Area"
+    data = await WeatherService.get_detailed_forecast(lat, lon, loc)
     return data
 
 @router.get("/wind-grid")

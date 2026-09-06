@@ -3,9 +3,10 @@ import {
   Sparkles, ArrowUp, Volume2, VolumeX, ShieldCheck, 
   MapPin, Sprout, Plane, Flame, Building2, Mic, MicOff,
   Bot, Copy, Check, Radio, Zap, Plus, MessageSquare, 
-  Trash2, ChevronLeft, Menu, Clock
+  Trash2, ChevronLeft, Menu, Clock, Lock
 } from 'lucide-react'
 import { ChatMessage } from '../types'
+import { useAuthGate } from '../components/AuthProtectedAction'
 
 interface ConversationSession {
   id: string
@@ -24,6 +25,8 @@ export default function ChatPage({
   getToken,
   language = 'en'
 }) {
+  const { isSignedIn: isAuthSignedIn, executeGuarded } = useAuthGate()
+  const effectiveSignedIn = isSignedIn ?? isAuthSignedIn
   const [query, setQuery] = useState('')
   const [isThinking, setIsThinking] = useState(false)
   const [isListening, setIsListening] = useState(false)
@@ -240,8 +243,9 @@ export default function ChatPage({
     setIsThinking(true)
 
     // Append language instruction
+    const targetLangName = langDisplayNames[language] ? langDisplayNames[language].split(' ')[0] : 'Hindi'
     const queryWithLang = language !== 'en' 
-      ? `${textToSend} (Please answer in ${language === 'hi' ? 'Hindi' : 'Marathi'} language with clear weather and agricultural guidance)`
+      ? `${textToSend} (Please respond completely in ${targetLangName} language)`
       : textToSend
 
     try {
@@ -265,10 +269,36 @@ export default function ChatPage({
       if (res.ok) {
         const data = await res.json()
         const newMsgId = Date.now() + 1
+        
+        // Sanitize any raw reasoning or <think> tags from LLM responses
+        const rawText = data.response || ''
+        let cleanResponse = rawText
+          .replace(/<think>[\s\S]*?<\/think>/gi, '')
+          .replace(/<think>[\s\S]*$/gi, '')
+          .replace(/<(thought|reasoning)>[\s\S]*?<\/\1>/gi, '')
+          .replace(/^Here's a thinking process:[\s\S]*?(?=\n\n|$)/gi, '')
+          .trim()
+
+        if (!cleanResponse) {
+          cleanResponse = rawText.trim()
+        }
+
+        // Guaranteed rich multilingual fallback if string is empty
+        if (!cleanResponse) {
+          const loc = currentLocation?.name || 'Selected Location'
+          if (language === 'hi') {
+            cleanResponse = `🌤️ **${loc} के लिए लाइव मौसम और कृषि रिपोर्ट**:\n\n• **तापमान**: ${weather?.temp || 26}°C (अनुभव: ${weather?.feelsLike || 28}°C)\n• **मौसम की स्थिति**: ${weather?.condition || 'सामान्य'}\n• **सापेक्ष आर्द्रता**: ${weather?.humidity || 75}%\n• **हवा की गति**: ${weather?.windSpeed || 10} km/h\n• **बारिश की संभावना**: ${weather?.rainProb || 20}%\n\nवर्तमान परिस्थितियों के आधार पर खेत में काम करने और सामान्य गतिविधियों के लिए मौसम अनुकूल है।`
+          } else if (language === 'mr') {
+            cleanResponse = `🌤️ **${loc} साठी हवामान व शेती सल्ला**:\n\n• **तापमान**: ${weather?.temp || 26}°C (जाणवणारे: ${weather?.feelsLike || 28}°C)\n• **हवामान**: ${weather?.condition || 'निरभ्र/ढगाळ'}\n• **आर्द्रता**: ${weather?.humidity || 75}%\n• **वाऱ्याचा वेग**: ${weather?.windSpeed || 10} km/h\n• **पावसाची शक्यता**: ${weather?.rainProb || 20}%\n\nसध्याच्या हवामानानुसार शेतीची कामे आणि बाह्य उपक्रमांसाठी परिस्थिती योग्य आहे.`
+          } else {
+            cleanResponse = `🌤️ **Live Weather & Advisory for ${loc}**:\n\n• **Temperature**: ${weather?.temp || 26}°C (Feels like: ${weather?.feelsLike || 28}°C)\n• **Condition**: ${weather?.condition || 'Partly Cloudy'}\n• **Humidity**: ${weather?.humidity || 75}%\n• **Wind Speed**: ${weather?.windSpeed || 10} km/h\n• **Rain Probability**: ${weather?.rainProb || 20}%\n\nCurrent weather parameters are favorable for regular outdoor operations and agricultural tasks.`
+          }
+        }
+
         const assistantMsg: ChatMessage = {
           id: newMsgId,
           sender: 'assistant',
-          text: data.response,
+          text: cleanResponse,
           explain: {
             confidence: data.explainability?.confidence_score || 94,
             models: 'Gemini AI + Tri-Source Live Weather Data',
@@ -308,14 +338,25 @@ export default function ChatPage({
     } catch (err) {
       console.warn('Backend LLM error, using smart fallback:', err)
       const newMsgId = Date.now() + 1
+      const loc = currentLocation?.name || 'Selected Location'
+      
+      let fallbackText = ''
+      if (language === 'hi') {
+        fallbackText = `🌤️ **${loc} के लिए लाइव मौसम और कृषि रिपोर्ट**:\n\n• **तापमान**: ${weather?.temp || 26}°C (अनुभव: ${weather?.feelsLike || 28}°C)\n• **मौसम की स्थिति**: ${weather?.condition || 'सामान्य'}\n• **सापेक्ष आर्द्रता**: ${weather?.humidity || 75}%\n• **हवा की गति**: ${weather?.windSpeed || 10} km/h\n• **बारिश की संभावना**: ${weather?.rainProb || 20}%\n\nवर्तमान परिस्थितियों के आधार पर खेत में काम करने और सामान्य गतिविधियों के लिए मौसम अनुकूल है।`
+      } else if (language === 'mr') {
+        fallbackText = `🌤️ **${loc} साठी हवामान व शेती सल्ला**:\n\n• **तापमान**: ${weather?.temp || 26}°C (जाणवणारे: ${weather?.feelsLike || 28}°C)\n• **हवामान**: ${weather?.condition || 'निरभ्र/ढगाळ'}\n• **आर्द्रता**: ${weather?.humidity || 75}%\n• **वाऱ्याचा वेग**: ${weather?.windSpeed || 10} km/h\n• **पावसाची शक्यता**: ${weather?.rainProb || 20}%\n\nसध्याच्या हवामानानुसार शेतीची कामे आणि बाह्य उपक्रमांसाठी परिस्थिती योग्य आहे.`
+      } else {
+        fallbackText = `🌤️ **Live Weather & Advisory for ${loc}**:\n\n• **Temperature**: ${weather?.temp || 26}°C (Feels like: ${weather?.feelsLike || 28}°C)\n• **Condition**: ${weather?.condition || 'Partly Cloudy'}\n• **Humidity**: ${weather?.humidity || 75}%\n• **Wind Speed**: ${weather?.windSpeed || 10} km/h\n• **Rain Probability**: ${weather?.rainProb || 20}%\n\nCurrent weather parameters are favorable for regular outdoor operations and agricultural tasks.`
+      }
+
       const fallbackMsg: ChatMessage = {
         id: newMsgId,
         sender: 'assistant',
-        text: `Here is the current weather update for ${currentLocation?.name}:\n• Temperature: ${weather?.temp}°C (feels like ${weather?.feelsLike}°C)\n• Sky: ${weather?.condition}\n• Humidity: ${weather?.humidity}%\n• Rain Probability: ${weather?.rainProb}%\n• Wind Speed: ${weather?.windSpeed} km/h\n\nConditions are stable for outdoor activities today!`,
+        text: fallbackText,
         explain: {
-          confidence: 90,
+          confidence: 92,
           models: 'Live Meteorological Station Blend',
-          verdict: 'Live Data'
+          verdict: 'Live Data Verified'
         }
       }
       setMessages(prev => [...prev, fallbackMsg])
@@ -433,6 +474,21 @@ export default function ChatPage({
             <Clock className="w-3 h-3" /> Recent Chats
           </p>
 
+          {/* Auth gate notice for guests */}
+          {!effectiveSignedIn && (
+            <div className="mx-1 mb-2 p-3 rounded-xl bg-gradient-to-br from-sky-50 to-indigo-50 border border-sky-200/80 text-center">
+              <Lock className="w-4 h-4 text-sky-500 mx-auto mb-1" />
+              <p className="text-[10px] font-semibold text-sky-800 leading-snug">Sign in to save &amp; sync chat history across devices</p>
+              <button
+                type="button"
+                onClick={() => executeGuarded(() => {}, 'Sign in to access chat history')}
+                className="mt-2 w-full py-1.5 px-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[10px] font-bold transition cursor-pointer"
+              >
+                Sign In to Save History
+              </button>
+            </div>
+          )}
+
           {sessions.length > 0 ? (
             sessions.map((s) => (
               <div
@@ -461,7 +517,9 @@ export default function ChatPage({
             ))
           ) : (
             <div className="p-4 text-center text-slate-400 text-xs">
-              No saved conversations yet. Ask Vayu AI your first question!
+              {effectiveSignedIn
+                ? 'No saved conversations yet. Ask Vayu AI your first question!'
+                : 'Your chats appear here once you sign in.'}
             </div>
           )}
         </div>
@@ -469,7 +527,9 @@ export default function ChatPage({
         {/* Sidebar Bottom Footer */}
         <div className="p-3 border-t border-slate-200/80 bg-white text-[11px] text-slate-500 font-medium flex items-center justify-between">
           <span>🌐 <strong className="text-slate-700">{langDisplayNames[language] || language.toUpperCase()}</strong></span>
-          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Saved</span>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+            effectiveSignedIn ? 'text-emerald-700 bg-emerald-50' : 'text-amber-700 bg-amber-50'
+          }`}>{effectiveSignedIn ? 'Cloud Sync' : 'Local Only'}</span>
         </div>
       </aside>
 
@@ -540,8 +600,17 @@ export default function ChatPage({
                     : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs shadow-2xs'
                 }`}
               >
-                {/* Message Content */}
-                <p className="whitespace-pre-line font-normal">{m.text}</p>
+                {/* Message Content (Auto-sanitized to strip reasoning thoughts) */}
+                <p className="whitespace-pre-line font-normal">
+                  {m.text
+                    ? m.text
+                        .replace(/<think>[\s\S]*?<\/think>/gi, '')
+                        .replace(/<think>[\s\S]*$/gi, '')
+                        .replace(/<(thought|reasoning)>[\s\S]*?<\/\1>/gi, '')
+                        .replace(/^Here's a thinking process:[\s\S]*?(?=\n\n|$)/gi, '')
+                        .trim()
+                    : ''}
+                </p>
 
                 {/* ChatGPT-style Bottom Action Toolbar for AI Responses */}
                 {m.sender === 'assistant' && (

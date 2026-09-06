@@ -1,8 +1,9 @@
 import React from 'react'
 import { 
   Users, Trophy, MapPin, PlusCircle, Activity, 
-  ShieldCheck, CheckCircle2, Award
+  ShieldCheck, CheckCircle2, Award, Lock
 } from 'lucide-react'
+import { useAuthGate } from '../components/AuthProtectedAction'
 
 export default function CommunityPage({ 
   currentLocation, 
@@ -11,6 +12,7 @@ export default function CommunityPage({
   nowcastCorrection,
   onOpenReportModal 
 }) {
+  const { isSignedIn, executeGuarded } = useAuthGate()
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
       
@@ -26,11 +28,14 @@ export default function CommunityPage({
           </p>
         </div>
 
+        {/* Auth-gated Submit Ground Report Button */}
         <button
-          onClick={onOpenReportModal}
+          onClick={() => executeGuarded(onOpenReportModal, 'Sign in to submit verified ground weather reports')}
+          title={isSignedIn ? 'Submit a ground weather report' : 'Sign in to submit ground reports'}
           className="px-4 py-2 rounded-2xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1.5 transition shadow-sm shadow-amber-500/20"
         >
           <PlusCircle className="w-4 h-4" /> Submit Ground Report (+15 Pts)
+          {!isSignedIn && <Lock className="w-3 h-3 text-amber-100 opacity-80" />}
         </button>
       </div>
 
@@ -161,7 +166,7 @@ export default function CommunityPage({
                 ))
               ) : (
                 <tr>
-                  <td colSpan="4" className="py-4 px-4 text-center text-slate-400">
+                  <td colSpan={4} className="py-4 px-4 text-center text-slate-400">
                     Leaderboard syncing with ground truth network...
                   </td>
                 </tr>

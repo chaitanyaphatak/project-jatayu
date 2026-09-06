@@ -19,6 +19,9 @@ importers:
       leaflet:
         specifier: ^1.9.4
         version: 1.9.4
+      leaflet-velocity:
+        specifier: ^2.1.4
+        version: 2.1.4
       lucide-react:
         specifier: ^0.359.0
         version: 0.359.0(react@18.3.1)
@@ -851,6 +854,9 @@ packages:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
     engines: {node: '>=6'}
     hasBin: true
+
+  leaflet-velocity@2.1.4:
+    resolution: {integrity: sha512-uTmSb2/Kn28S0itlmJBMy2ZRKsisWUr2wm9rtkKXjpq9Sai7tqKdTRHKfLgTOgEdWFf5Ctt2bQoB7kb50qC7eg==}
 
   leaflet@1.9.4:
     resolution: {integrity: sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA==}
@@ -1758,6 +1764,8 @@ snapshots:
   jsesc@3.1.0: {}
 
   json5@2.2.3: {}
+
+  leaflet-velocity@2.1.4: {}
 
   leaflet@1.9.4: {}
 

@@ -13,9 +13,22 @@ export const INDIA_LOCATIONS = [
   { name: 'Kolkata, West Bengal', state: 'West Bengal', region: 'East', lat: 22.5726, lon: 88.3639, type: 'Metro / Coastal', crop: 'Jute & Paddy', risk: 'Bay of Bengal Depressions' },
   { name: 'Ahmedabad, Gujarat', state: 'Gujarat', region: 'West', lat: 23.0225, lon: 72.5714, type: 'Metro', crop: 'Cotton & Groundnut', risk: 'Extreme Summer Heat' },
 
-  // --- MAHARASHTRA (AGRI & HILL HUBS) ---
+  // --- MAHARASHTRA (METROS, AGRI, PUNE SUB-LOCALITIES & HILL HUBS) ---
+  { name: 'Pune (Haveli / City), Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.5204, lon: 73.8567, type: 'Agri-Metro', crop: 'Soybean & Sugarcane', risk: 'Convective Updraft' },
+  { name: 'Bhugaon (Mulshi / Pune), Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.5028, lon: 73.7424, type: 'Ghat Fringe Village', crop: 'Paddy & Vegetables', risk: 'Valley Mist & Micro-climate' },
+  { name: 'Bhukum (Mulshi / Pune), Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.4891, lon: 73.7121, type: 'Ghat Fringe Village', crop: 'Paddy & Floriculture', risk: 'Orographic Moisture' },
+  { name: 'Bavdhan, Pune, Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.5133, lon: 73.7699, type: 'Suburban Hub', crop: 'Horticulture', risk: 'Valley Wind Drift' },
+  { name: 'Kothrud, Pune, Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.5074, lon: 73.8077, type: 'Urban Hub', crop: 'Urban Green', risk: 'Micro-heat Island' },
+  { name: 'Hinjawadi IT Park, Pune, Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.5913, lon: 73.7389, type: 'Tech & Suburban', crop: 'Regional Agri', risk: 'Convective Storms' },
+  { name: 'Wakad / Baner, Pune, Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.5987, lon: 73.7684, type: 'Urban Hub', crop: 'Horticulture', risk: 'Localized Squalls' },
+  { name: 'Pimpri-Chinchwad, Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.6298, lon: 73.7997, type: 'Industrial Metro', crop: 'Vegetables', risk: 'Urban Runoff' },
+  { name: 'Hadapsar / Magarpatta, Pune, Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.5089, lon: 73.9260, type: 'Urban Hub', crop: 'Vegetables & Floriculture', risk: 'Heat Anomaly' },
+  { name: 'Viman Nagar / Airport, Pune, Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.5679, lon: 73.9143, type: 'Aviation Zone', crop: 'Urban', risk: 'Crosswind & Visibility' },
+  { name: 'Khadakwasla / Sinhagad, Pune, Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.4418, lon: 73.7628, type: 'Catchment & Hills', crop: 'Paddy & Forestry', risk: 'High Precipitation' },
+  { name: 'Pirangut / Mulshi, Maharashtra', state: 'Maharashtra', region: 'West', lat: 18.5126, lon: 73.6807, type: 'Agri-Valley', crop: 'Rice & Sugarcane', risk: 'Orographic Inundation' },
   { name: 'Nashik (Panchavati), Maharashtra', state: 'Maharashtra', region: 'West', lat: 19.9975, lon: 73.7898, type: 'Agri-Hub', crop: 'Grapes & Onion', risk: 'Unseasonal Hail' },
   { name: 'Nagpur (Vidarbha), Maharashtra', state: 'Maharashtra', region: 'West', lat: 21.1458, lon: 79.0882, type: 'Agri-Hub', crop: 'Orange & Cotton', risk: 'Heatwave & Drought' },
+  { name: 'Bhugaon (Seloo / Wardha), Maharashtra', state: 'Maharashtra', region: 'West', lat: 21.0899, lon: 79.3403, type: 'Vidarbha Village', crop: 'Cotton & Soybean', risk: 'Arid Heatwave' },
   { name: 'Chhatrapati Sambhajinagar (Aurangabad)', state: 'Maharashtra', region: 'West', lat: 19.8762, lon: 75.3433, type: 'Agri-Hub', crop: 'Cotton & Maize', risk: 'Dry Spell Saturation' },
   { name: 'Kolhapur, Maharashtra', state: 'Maharashtra', region: 'West', lat: 16.7050, lon: 74.2433, type: 'Agri-Hub', crop: 'Sugarcane & Rice', risk: 'Panchganga Flood Inundation' },
   { name: 'Solapur, Maharashtra', state: 'Maharashtra', region: 'West', lat: 17.6599, lon: 75.9064, type: 'Agri-Hub', crop: 'Pomegranate & Jowar', risk: 'Arid Heatwave' },
@@ -105,15 +118,30 @@ export const INDIA_LOCATIONS = [
   { name: 'Daman & Diu, UT', state: 'Daman and Diu', region: 'West', lat: 20.4283, lon: 72.8397, type: 'Coastal UT', crop: 'Fishing / Palm', risk: 'Arabian Sea Swell' }
 ]
 
-// Fuzzy match search helper for auto-recommendations
+// Smart ranked search helper for auto-recommendations
 export function searchIndiaLocations(query, limit = 8) {
   if (!query || query.trim().length === 0) return []
   const clean = query.toLowerCase().trim()
   
-  return INDIA_LOCATIONS.filter(loc => 
-    loc.name.toLowerCase().includes(clean) ||
-    loc.state.toLowerCase().includes(clean) ||
-    loc.region.toLowerCase().includes(clean) ||
-    loc.crop.toLowerCase().includes(clean)
-  ).slice(0, limit)
+  const matches = INDIA_LOCATIONS.map(loc => {
+    const nameLower = loc.name.toLowerCase()
+    const stateLower = loc.state.toLowerCase()
+    const regionLower = loc.region.toLowerCase()
+    const cropLower = loc.crop.toLowerCase()
+
+    let score = 0
+    if (nameLower.startsWith(clean)) score = 100
+    else if (nameLower.split(/[\s,()/-]+/).some(token => token.startsWith(clean))) score = 80
+    else if (nameLower.includes(clean)) score = 60
+    else if (stateLower.startsWith(clean)) score = 40
+    else if (stateLower.includes(clean)) score = 30
+    else if (regionLower.includes(clean) || cropLower.includes(clean)) score = 10
+
+    return { loc, score }
+  })
+  .filter(item => item.score > 0)
+  .sort((a, b) => b.score - a.score)
+  .map(item => item.loc)
+
+  return matches.slice(0, limit)
 }

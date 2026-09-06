@@ -206,11 +206,16 @@ export default function ForecastPage({ currentLocation, weather }) {
 
       {/* ─── 4. NEW FEATURE: MORNING / AFTERNOON / NIGHT BREAKDOWN ────────── */}
       <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <Sun className="w-4 h-4 text-amber-500" />
-            Diurnal Breakdown for {dailyList[selectedDay]?.date || 'Today'}
-          </h3>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Sun className="w-4 h-4 text-amber-500" />
+              Day & Night Breakdown for {dailyList[selectedDay]?.date || 'Today'}
+            </h3>
+            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+              Morning • Afternoon • Evening • Night weather cycle
+            </p>
+          </div>
           <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200">
             Selected Day #{selectedDay + 1}
           </span>

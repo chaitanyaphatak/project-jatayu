@@ -82,3 +82,17 @@ def verify_clerk_token(credentials: Optional[HTTPAuthorizationCredentials] = Sec
         detail="Clerk authentication verification failed",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+def get_optional_user(credentials: Optional[HTTPAuthorizationCredentials] = Security(security_scheme)) -> Optional[Dict[str, Any]]:
+    """
+    Returns verified Clerk user payload if a valid Bearer token is provided,
+    or None if the request is anonymous / unauthenticated.
+    Allows open public endpoints to provide personalized features when logged in
+    without failing or blocking guest users.
+    """
+    if not credentials:
+        return None
+    try:
+        return verify_clerk_token(credentials)
+    except HTTPException:
+        return None

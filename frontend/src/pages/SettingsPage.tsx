@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react'
 import { 
   Settings, User, MapPin, Globe, Bell, ShieldCheck,
-  Plus, Trash2, Sprout, Plane, Flame, Building2, LogIn, CheckCircle2,
-  Volume2, Bot, Sparkles, MessageSquare
+  Plus, Trash2, Sprout, Plane, Flame, Building2, LogIn, UserPlus, CheckCircle2,
+  Volume2, Bot, Sparkles, MessageSquare, Lock
 } from 'lucide-react'
+import { useAuthGate } from '../components/AuthProtectedAction'
 
 export default function SettingsPage({ 
   user, 
@@ -24,6 +25,8 @@ export default function SettingsPage({
     aviationTurbulence: false,
     dailySummary: true
   })
+  const { isSignedIn: isAuthSignedIn, executeGuarded } = useAuthGate()
+  const effectiveSignedIn = isSignedIn ?? isAuthSignedIn
   
   const [savedFarms, setSavedFarms] = useState([
     { id: 1, name: 'Pune Plot A (Soybean)', lat: 18.5204, lon: 73.8567, crop: 'Soybean (Flowering)' },
@@ -176,22 +179,34 @@ export default function SettingsPage({
           <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-sky-50/30 to-blue-50/20 border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-1 min-w-0">
               <p className="text-xs font-bold text-slate-900">
-                Sign in to synchronize your weather data
+                Sign in or register an account to synchronize your weather data
               </p>
               <p className="text-[11px] text-slate-500 max-w-md">
                 Save agricultural plots, sync past chat conversations with Vayu AI, and get personalized SMS alerts.
               </p>
             </div>
 
-            <SignInButton mode="modal" afterSignInUrl="/overview" afterSignUpUrl="/overview">
-              <button
-                id="settings-signin-btn"
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-2 transition shadow-xs shrink-0 cursor-pointer"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                Sign In
-              </button>
-            </SignInButton>
+            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+              <SignInButton mode="modal" fallbackRedirectUrl="/dashboard">
+                <button
+                  id="settings-signin-btn"
+                  className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200/90 flex items-center justify-center gap-1.5 transition shadow-2xs shrink-0 cursor-pointer"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-slate-500" />
+                  Sign In
+                </button>
+              </SignInButton>
+
+              <SignUpButton mode="modal" fallbackRedirectUrl="/dashboard">
+                <button
+                  id="settings-signup-btn"
+                  className="flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-600 via-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white flex items-center justify-center gap-1.5 transition shadow-xs shrink-0 cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Sign Up
+                </button>
+              </SignUpButton>
+            </div>
           </div>
         </SignedOut>
       </div>
@@ -312,28 +327,50 @@ export default function SettingsPage({
         </div>
       </div>
 
-      {/* Saved Farms & Plots */}
+      {/* Saved Farms & Plots (Auth-gated cloud sync) */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-4">
         <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
           <MapPin className="w-4 h-4 text-sky-600" />
-          Saved Plots, Farms & Airway Corridors
+          Saved Plots, Farms &amp; Airway Corridors
+          {!effectiveSignedIn && (
+            <span className="ml-auto text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
+              <Lock className="w-2.5 h-2.5" /> Sign in to cloud-sync
+            </span>
+          )}
         </h3>
 
-        <form onSubmit={handleAddFarm} className="flex gap-2">
-          <input
-            type="text"
-            value={newFarmName}
-            onChange={(e) => setNewFarmName(e.target.value)}
-            placeholder="Save current location as new plot (e.g. Satara Vineyard Block B)..."
-            className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs text-slate-800"
-          />
-          <button
-            type="submit"
-            className="px-4 py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-1 shadow-xs transition shrink-0 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Save Plot
-          </button>
-        </form>
+        {effectiveSignedIn ? (
+          <form onSubmit={handleAddFarm} className="flex gap-2">
+            <input
+              type="text"
+              value={newFarmName}
+              onChange={(e) => setNewFarmName(e.target.value)}
+              placeholder="Save current location as new plot (e.g. Satara Vineyard Block B)..."
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 text-xs text-slate-800"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-1 shadow-xs transition shrink-0 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Save Plot
+            </button>
+          </form>
+        ) : (
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-sky-50 to-indigo-50 border border-sky-200/80 flex items-center gap-3">
+            <Lock className="w-5 h-5 text-sky-500 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-sky-900">Cloud-sync your agricultural plots</p>
+              <p className="text-[11px] text-sky-700 mt-0.5">Sign in to save farm plots, sync across devices, and receive crop-stage-specific alerts.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => executeGuarded(() => {}, 'Sign in to save farm plots and sync across devices')}
+              className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold transition shrink-0 cursor-pointer"
+            >
+              Sign In
+            </button>
+          </div>
+        )}
 
         <div className="space-y-2 pt-2">
           {savedFarms.map((farm) => (
@@ -353,13 +390,15 @@ export default function SettingsPage({
                 >
                   Switch Location
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteFarm(farm.id)}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 transition rounded-lg hover:bg-slate-200 cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {effectiveSignedIn && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteFarm(farm.id)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 transition rounded-lg hover:bg-slate-200 cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           ))}

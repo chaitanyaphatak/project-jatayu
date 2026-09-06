@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { 
   AlertTriangle, ShieldCheck, Flame, Bell, CheckCircle2, 
   MapPin, Activity, ArrowUpRight, Zap, RefreshCw, AlertCircle,
-  CloudRain, Wind, Eye, Droplets, Sun, Info
+  CloudRain, Wind, Eye, Droplets, Sun, Info, Lock, BellRing
 } from 'lucide-react'
+import { useAuthGate } from '../components/AuthProtectedAction'
 
 // Hyperlocal surrounding village & taluka database for major regions + dynamic fallback
 const getSurroundingVillages = (cityName: string = '', baseLat: number, baseLon: number) => {
@@ -23,7 +24,7 @@ const getSurroundingVillages = (cityName: string = '', baseLat: number, baseLon:
   if (lower.includes('mumbai') || lower.includes('thane') || lower.includes('navi mumbai')) {
     return [
       { name: 'Thane & Ghodbunder Suburbs', distance: '22 km North', type: 'Estuary Corridor', temp: 31.2, rainRisk: 'Passing Showers (55%)', anomaly: '+1.2σ', status: 'WATCH', note: 'High relative humidity (88%). Slight urban waterlogging risk.' },
-      { name: 'Kalyan - Dombivli - Ulhas Basin', distance: '35 km North-East', type: 'River Floodplain', temp: 32.5, rainRisk: 'Scattered Drizzle (35%)', anomaly: '+0.7σ', status: 'SAFE', note: 'Normal diurnal cycle. Stable transit.' },
+      { name: 'Kalyan - Dombivli - Ulhas Basin', distance: '35 km North-East', type: 'River Floodplain', temp: 32.5, rainRisk: 'Scattered Drizzle (35%)', anomaly: '+0.7σ', status: 'SAFE', note: 'Normal day & night cycle. Stable transit.' },
       { name: 'Panvel & Navi Mumbai South', distance: '28 km East', type: 'Coastal Foothills', temp: 30.8, rainRisk: 'Moderate Rain (60%)', anomaly: '+1.5σ', status: 'WATCH', note: 'Coastal wind shear up to 28 km/h.' },
       { name: 'Alibaug & Raigad Coastal Villages', distance: '45 km South', type: 'Maritime Shore', temp: 29.5, rainRisk: 'Squall / High Waves (70%)', anomaly: '+2.0σ', status: 'ALERT', note: 'Fishermen advisory active. Rough coastal swells.' }
     ]
@@ -60,6 +61,8 @@ const getSurroundingVillages = (cityName: string = '', baseLat: number, baseLon:
 export default function AlertsPage({ currentLocation, userRole, cropStage }: any) {
   const [alerts, setAlerts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [subscribed, setSubscribed] = useState(false)
+  const { isSignedIn, executeGuarded } = useAuthGate()
 
   const fetchAlerts = async () => {
     setLoading(true)
@@ -272,6 +275,42 @@ export default function AlertsPage({ currentLocation, userRole, cropStage }: any
             )
           })}
         </div>
+      </div>
+      {/* ─── AUTH-GATED: Subscribe to Proactive Alerts ─────────────────── */}
+      <div className="rounded-3xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+        <div className="p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
+          <div className="space-y-1.5">
+            <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+              <BellRing className="w-4 h-4 text-sky-600" />
+              Proactive SMS &amp; WhatsApp Alerts
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm">
+              Get real-time extreme weather alerts, crop damage warnings, and storm notifications directly on your phone for <strong className="text-slate-800">{currentLocation?.name?.split(',')[0] || 'your location'}</strong>.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => executeGuarded(() => setSubscribed(prev => !prev), 'Sign in to receive SMS & WhatsApp weather alerts')}
+            title={isSignedIn ? (subscribed ? 'Unsubscribe from alerts' : 'Subscribe to alerts') : 'Sign in to subscribe'}
+            className={`px-5 py-2.5 rounded-2xl text-sm font-bold flex items-center gap-2 transition shadow-xs shrink-0 cursor-pointer ${
+              subscribed
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                : 'bg-sky-600 hover:bg-sky-700 text-white'
+            }`}
+          >
+            <Bell className="w-4 h-4" />
+            {subscribed ? '✓ Subscribed' : 'Subscribe to Alerts'}
+            {!isSignedIn && <Lock className="w-3.5 h-3.5 text-white/70" />}
+          </button>
+        </div>
+
+        {!isSignedIn && (
+          <div className="px-5 pb-4 text-xs text-slate-500 border-t border-slate-100 pt-3 flex items-center gap-2">
+            <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span>Sign in with your account to enable SMS / WhatsApp alert subscriptions and manage notification preferences.</span>
+          </div>
+        )}
       </div>
 
     </div>

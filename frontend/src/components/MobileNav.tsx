@@ -1,16 +1,19 @@
 import React, { useEffect } from 'react'
 import { NavLink, useLocation, Link } from 'react-router-dom'
+import { SignedIn, SignedOut, SignInButton, SignUpButton, useUser, useClerk } from '@clerk/clerk-react'
 import { 
   BarChart3, Calendar, AlertTriangle, Layers, 
   Sparkles, Sprout, Users, TrendingUp, Settings, X, CloudRain, Award,
-  MapPin, ShieldCheck, CheckCircle2
+  MapPin, ShieldCheck, CheckCircle2, LogIn, UserPlus, LogOut, User
 } from 'lucide-react'
 
 export default function MobileNav({ isOpen, onClose, currentLocation, trustScore }) {
   const location = useLocation()
+  const { user } = useUser()
+  const { signOut, openUserProfile } = useClerk()
 
   const navItems = [
-    { to: '/overview', label: 'Overview', icon: BarChart3, badge: 'Live' },
+    { to: '/dashboard', label: 'Dashboard', icon: BarChart3, badge: 'Live' },
     { to: '/forecast', label: '7-Day Forecast', icon: Calendar },
     { to: '/alerts', label: 'Weather Alerts', icon: AlertTriangle, badge: 'Active', badgeColor: 'bg-amber-100 text-amber-800' },
     { to: '/maps', label: 'Interactive Maps', icon: Layers },
@@ -44,10 +47,10 @@ export default function MobileNav({ isOpen, onClose, currentLocation, trustScore
         {/* Drawer Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-sky-50/60 to-white shrink-0">
           <Link 
-            to="/overview"
+            to="/dashboard"
             onClick={() => {
               onClose()
-              if (location.pathname === '/overview' || location.pathname === '/') {
+              if (location.pathname === '/dashboard' || location.pathname === '/overview' || location.pathname === '/') {
                 window.location.reload()
               }
             }}
@@ -83,7 +86,8 @@ export default function MobileNav({ isOpen, onClose, currentLocation, trustScore
           <nav className="space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon
-              const isActive = location.pathname === item.to || (item.to === '/overview' && location.pathname === '/')
+              const isActive = location.pathname === item.to || 
+                ((item.to === '/dashboard' || item.to === '/overview') && (location.pathname === '/' || location.pathname === '/overview' || location.pathname === '/dashboard'))
 
               return (
                 <NavLink
@@ -111,9 +115,69 @@ export default function MobileNav({ isOpen, onClose, currentLocation, trustScore
           </nav>
         </div>
 
-        {/* Rich Drawer Footer (Eliminating blank white void) */}
+        {/* Rich Drawer Footer */}
         <div className="p-3.5 border-t border-slate-100 bg-slate-50/80 shrink-0 space-y-2.5">
-          <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex items-center justify-between">
+          
+          {/* Auth Section in Drawer */}
+          <SignedOut>
+            <div className="grid grid-cols-2 gap-2">
+              <SignInButton mode="modal" fallbackRedirectUrl="/overview">
+                <button
+                  onClick={onClose}
+                  className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-slate-500" />
+                  Sign In
+                </button>
+              </SignInButton>
+
+              <SignUpButton mode="modal" fallbackRedirectUrl="/overview">
+                <button
+                  onClick={onClose}
+                  className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white flex items-center justify-center gap-1.5 shadow-xs transition cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Sign Up
+                </button>
+              </SignUpButton>
+            </div>
+          </SignedOut>
+
+          <SignedIn>
+            <div className="p-2 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between gap-2 shadow-2xs">
+              <div 
+                onClick={() => { onClose(); openUserProfile(); }}
+                className="flex items-center gap-2 min-w-0 cursor-pointer flex-1"
+              >
+                {user?.imageUrl ? (
+                  <img src={user.imageUrl} alt="User" className="w-7 h-7 rounded-full object-cover ring-1 ring-sky-200 shrink-0" />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-sky-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                    {(user?.firstName || 'U').charAt(0)}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 truncate">
+                    {user?.fullName || user?.firstName || 'Logged in User'}
+                  </p>
+                  <p className="text-[10px] text-emerald-600 font-bold">Active Account</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  onClose()
+                  signOut(() => { window.location.href = '/' })
+                }}
+                title="Sign Out"
+                className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer shrink-0"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          </SignedIn>
+
+          {/* Current Location Badge */}
+          <div className="p-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
               <MapPin className="w-3.5 h-3.5 text-sky-600 shrink-0" />
               <div className="min-w-0">

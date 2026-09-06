@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Weather
     OPENWEATHER_API_KEY: str = ""
     WEATHERAPI_COM_KEY: str = ""
+    INDIANAPI_KEY: str = ""
     USE_MOCK_FALLBACK: bool = True
     
     # LLM

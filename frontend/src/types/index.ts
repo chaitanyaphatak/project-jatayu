@@ -10,6 +10,17 @@ export interface LocationItem {
   risk?: string
 }
 
+export interface WeatherSourceReading {
+  name: string
+  short_name: string
+  temp: number
+  feels_like?: number
+  weight_percent: number
+  raw_weight: number
+  status: 'active' | 'excluded_anomaly' | string
+  model_desc?: string
+}
+
 export interface WeatherData {
   temp: number
   feelsLike: number
@@ -18,8 +29,20 @@ export interface WeatherData {
   windSpeed: number
   surfacePressure: number
   rainProb: number
+  weatherCode?: number
+  isDay?: boolean
+  conditionCode?: number
+  sunrise?: string
+  sunset?: string
   aqi?: number
+  visibility?: number
+  uvIndex?: number
   sourcesUsed?: string[]
+  sourceReadings?: WeatherSourceReading[]
+  confidenceLevel?: 'high' | 'moderate' | 'low' | string
+  confidenceLabel?: string
+  confidenceDesc?: string
+  confidenceSpread?: number
   modelAgreement?: number
   modelRating?: string
   contributingFactors?: string[]

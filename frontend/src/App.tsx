@@ -20,6 +20,7 @@ import ClimatePage from './pages/ClimatePage'
 import SettingsPage from './pages/SettingsPage'
 
 import { LocationItem, WeatherData, SystemAlert, CrowdReport, UserRole } from './types'
+import { getCachedWeather, setCachedWeather } from './utils/weatherCache'
 
 export default function App() {
   const { isSignedIn, user } = useUser()
@@ -109,20 +110,32 @@ export default function App() {
 
   // Live Weather Telemetry State
   const [weather, setWeather] = useState<WeatherData>({
-    temp: 24.5,
-    feelsLike: 26.2,
+    temp: 26.5,
+    feelsLike: 27.0,
     condition: 'Partly cloudy with stratocumulus',
-    humidity: 82,
-    windSpeed: 11.4,
+    humidity: 78,
+    windSpeed: 12.4,
     surfacePressure: 1008.5,
-    rainProb: 60,
+    rainProb: 40,
     aqi: 45,
-    sourcesUsed: ['Open-Meteo (NWP Ensemble)', 'WeatherAPI.com', 'OpenWeatherMap'],
-    modelAgreement: 94,
-    modelRating: 'High Consensus',
+    sourcesUsed: ['Open-Meteo (ECMWF/GFS)', 'OpenWeatherMap', 'WeatherAPI.com'],
+    sourceReadings: [
+      { name: 'Open-Meteo (ECMWF/GFS)', short_name: 'Open-Meteo', temp: 26.3, weight_percent: 50, raw_weight: 0.35, status: 'active', model_desc: 'ECMWF & GFS NWP Physics' },
+      { name: 'OpenWeatherMap', short_name: 'OpenWeather', temp: 28.5, weight_percent: 29, raw_weight: 0.20, status: 'active', model_desc: 'Global Observation & Radar Grid' },
+      { name: 'WeatherAPI.com', short_name: 'WeatherAPI', temp: 24.1, weight_percent: 21, raw_weight: 0.15, status: 'active', model_desc: 'Micro-climate Observation Network' }
+    ],
+    confidenceLevel: 'moderate',
+    confidenceLabel: 'Moderate confidence',
+    confidenceDesc: 'Sources vary by 4.4°C across NWP & micro-climate models',
+    confidenceSpread: 4.4,
+    modelAgreement: 88,
+    modelRating: 'Moderate Variance (4.4°C)',
     contributingFactors: [],
     activityImpact: null
   })
+
+  // Weather Loading State for Instant Optimistic UI Feedback
+  const [isWeatherLoading, setIsWeatherLoading] = useState(false)
 
   // Proactive Alert Ticker State
   const [systemAlert, setSystemAlert] = useState<SystemAlert>({
@@ -131,13 +144,19 @@ export default function App() {
     zScore: 'Isolation Forest: +1.0σ Anomaly'
   })
 
-  // 1. Fetch live telemetry from backend Tri-Source engine
-  const fetchLiveWeather = async (lat = currentLocation.lat, lon = currentLocation.lon, name = currentLocation.name) => {
+  // 1. Fetch live telemetry from backend Tri-Source engine with caching
+  const fetchLiveWeather = async (
+    lat = currentLocation.lat, 
+    lon = currentLocation.lon, 
+    name = currentLocation.name,
+    silent = false
+  ) => {
+    if (!silent) setIsWeatherLoading(true)
     try {
       const res = await fetch(`/api/v1/weather/current?lat=${lat}&lon=${lon}&location_name=${encodeURIComponent(name)}`)
       if (res.ok) {
         const data = await res.json()
-        setWeather({
+        const newWeather: WeatherData = {
           temp: data.temperature,
           feelsLike: data.feels_like,
           condition: data.condition,
@@ -145,16 +164,30 @@ export default function App() {
           windSpeed: data.wind_speed,
           surfacePressure: data.surface_pressure || 1008.0,
           rainProb: data.precipitation_prob,
+          weatherCode: data.weather_code,
+          isDay: data.is_day !== undefined ? data.is_day : true,
+          conditionCode: data.condition_code,
           aqi: data.air_quality_index || 48,
+          visibility: data.visibility_km ?? 10.0,
+          uvIndex: data.uv_index ?? 5.2,
           sourcesUsed: data.sources_used || ['Open-Meteo', 'WeatherAPI.com', 'OpenWeatherMap'],
+          sourceReadings: data.source_readings || [],
+          confidenceLevel: data.confidence_level || 'moderate',
+          confidenceLabel: data.confidence_label || 'Moderate confidence',
+          confidenceDesc: data.confidence_desc || 'Multi-source blended observation',
+          confidenceSpread: data.confidence_spread !== undefined ? data.confidence_spread : 2.5,
           modelAgreement: data.model_agreement_score || 92,
           modelRating: data.model_agreement_rating || 'High Consensus',
           contributingFactors: data.contributing_factors || [],
           activityImpact: data.activity_impact
-        })
+        }
+        setWeather(newWeather)
+        setCachedWeather(lat, lon, newWeather)
       }
     } catch (err) {
       console.warn('Weather fetch fallback:', err)
+    } finally {
+      setIsWeatherLoading(false)
     }
   }
 
@@ -194,11 +227,28 @@ export default function App() {
     }
   }
 
-  // Handle location selection
+  // Handle location selection with instant optimistic response and Stale-While-Revalidate caching
   const handleSelectLocation = (loc: LocationItem) => {
+    // 1. Instantly update location
     setCurrentLocation(loc)
     lsWrite('location', loc)
-    fetchLiveWeather(loc.lat, loc.lon, loc.name)
+
+    // 2. Check instant in-memory cache (0ms instant transition)
+    const cached = getCachedWeather(loc.lat, loc.lon)
+    if (cached.data) {
+      setWeather(cached.data)
+      setIsWeatherLoading(false)
+      // If stale, silently revalidate in background without blocking UI
+      if (cached.isStale) {
+        fetchLiveWeather(loc.lat, loc.lon, loc.name, true)
+      }
+    } else {
+      // 3. If uncached, show immediate skeleton state and fetch
+      setIsWeatherLoading(true)
+      fetchLiveWeather(loc.lat, loc.lon, loc.name, false)
+    }
+
+    // Trigger non-blocking alerts and crowd sync
     fetchLiveAlerts(loc.lat, loc.lon)
     fetchCrowdData(loc.lat, loc.lon)
   }
@@ -224,20 +274,41 @@ export default function App() {
     })
   }
 
-  // Handle GPS location detection
+  // Handle GPS location detection with smart reverse geocoding
   const handleDetectGPSLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
           const lat = parseFloat(pos.coords.latitude.toFixed(4))
           const lon = parseFloat(pos.coords.longitude.toFixed(4))
+          let placeName = `Live Station (${lat}, ${lon})`
+          let stateName = 'India'
+
+          try {
+            const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}`)
+            if (res.ok) {
+              const data = await res.json()
+              const props = data.features?.[0]?.properties || {}
+              const place = props.name || props.city || props.district || ''
+              const state = props.state || ''
+              const district = props.county || props.district || ''
+              if (place) {
+                const distStr = district && district !== place ? ` (${district})` : ''
+                placeName = `${place}${distStr}, ${state || 'India'}`
+                stateName = state || 'India'
+              }
+            }
+          } catch (e) {
+            console.warn('Reverse geocoding error:', e)
+          }
+
           const gpsLocation: LocationItem = {
-            name: `Live Station (${lat}, ${lon})`,
-            state: 'India',
+            name: placeName,
+            state: stateName,
             region: 'Local Sector',
             lat: lat,
             lon: lon,
-            type: 'GPS Station',
+            type: 'Live GPS Location',
             crop: 'Regional Agriculture',
             risk: 'Micro-climate Monitoring'
           }
@@ -363,6 +434,13 @@ export default function App() {
             onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
           />
 
+          {/* Top Subtle Weather Sync Progress Bar */}
+          {isWeatherLoading && (
+            <div className="sticky top-[53px] left-0 right-0 z-40 h-[2.5px] bg-slate-200/60 overflow-hidden pointer-events-none">
+              <div className="h-full bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500 animate-pulse w-full shadow-xs" />
+            </div>
+          )}
+
           {/* Page Routing Views */}
           <main className="p-3 sm:p-6 lg:p-8 flex-1 max-w-7xl w-full mx-auto">
             <Routes>
@@ -375,6 +453,22 @@ export default function App() {
                     userRole={userRole}
                     systemAlert={systemAlert}
                     crowdReports={crowdReports}
+                    isLoading={isWeatherLoading}
+                    onRefreshWeather={() => fetchLiveWeather(currentLocation.lat, currentLocation.lon, currentLocation.name, false)}
+                  />
+                } 
+              />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <OverviewPage 
+                    weather={weather}
+                    currentLocation={currentLocation}
+                    userRole={userRole}
+                    systemAlert={systemAlert}
+                    crowdReports={crowdReports}
+                    isLoading={isWeatherLoading}
+                    onRefreshWeather={() => fetchLiveWeather(currentLocation.lat, currentLocation.lon, currentLocation.name, false)}
                   />
                 } 
               />
@@ -387,6 +481,8 @@ export default function App() {
                     userRole={userRole}
                     systemAlert={systemAlert}
                     crowdReports={crowdReports}
+                    isLoading={isWeatherLoading}
+                    onRefreshWeather={() => fetchLiveWeather(currentLocation.lat, currentLocation.lon, currentLocation.name, false)}
                   />
                 } 
               />
@@ -481,7 +577,7 @@ export default function App() {
                   />
                 } 
               />
-              <Route path="*" element={<Navigate to="/overview" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </main>
 
