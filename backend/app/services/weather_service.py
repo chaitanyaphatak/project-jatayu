@@ -146,66 +146,66 @@ class WeatherService:
                 hourly = raw.get("hourly", {})
                 daily = raw.get("daily", {})
 
-                    # Extract next 24 hours
-                    hourly_list = []
-                    times = hourly.get("time", [])[:24]
-                    temps = hourly.get("temperature_2m", [])[:24]
-                    rain_probs = hourly.get("precipitation_probability", [])[:24]
-                    humidities = hourly.get("relative_humidity_2m", [])[:24]
-                    winds = hourly.get("wind_speed_10m", [])[:24]
-                    codes = hourly.get("weather_code", [])[:24]
-                    uvs = hourly.get("uv_index", [])[:24]
-                    pressures = hourly.get("surface_pressure", [])[:24]
+                # Extract next 24 hours
+                hourly_list = []
+                times = hourly.get("time", [])[:24]
+                temps = hourly.get("temperature_2m", [])[:24]
+                rain_probs = hourly.get("precipitation_probability", [])[:24]
+                humidities = hourly.get("relative_humidity_2m", [])[:24]
+                winds = hourly.get("wind_speed_10m", [])[:24]
+                codes = hourly.get("weather_code", [])[:24]
+                uvs = hourly.get("uv_index", [])[:24]
+                pressures = hourly.get("surface_pressure", [])[:24]
 
-                    for i in range(len(times)):
-                        hourly_list.append({
-                            "time": times[i].split("T")[1] if "T" in times[i] else times[i],
-                            "full_time": times[i],
-                            "temp": temps[i] if i < len(temps) else 25.0,
-                            "rain_prob": rain_probs[i] if i < len(rain_probs) else 0,
-                            "humidity": humidities[i] if i < len(humidities) else 70,
-                            "wind_speed": winds[i] if i < len(winds) else 10.0,
-                            "condition": cls._wmo_code_to_str(codes[i] if i < len(codes) else 0),
-                            "uv_index": uvs[i] if i < len(uvs) else 3.0,
-                            "pressure": pressures[i] if i < len(pressures) else 1008.0
-                        })
+                for i in range(len(times)):
+                    hourly_list.append({
+                        "time": times[i].split("T")[1] if "T" in times[i] else times[i],
+                        "full_time": times[i],
+                        "temp": temps[i] if i < len(temps) else 25.0,
+                        "rain_prob": rain_probs[i] if i < len(rain_probs) else 0,
+                        "humidity": humidities[i] if i < len(humidities) else 70,
+                        "wind_speed": winds[i] if i < len(winds) else 10.0,
+                        "condition": cls._wmo_code_to_str(codes[i] if i < len(codes) else 0),
+                        "uv_index": uvs[i] if i < len(uvs) else 3.0,
+                        "pressure": pressures[i] if i < len(pressures) else 1008.0
+                    })
 
-                    # Extract 7 days daily
-                    daily_list = []
-                    d_times = daily.get("time", [])[:7]
-                    d_max = daily.get("temperature_2m_max", [])[:7]
-                    d_min = daily.get("temperature_2m_min", [])[:7]
-                    d_rain = daily.get("precipitation_probability_max", [])[:7]
-                    d_sum = daily.get("precipitation_sum", [])[:7]
-                    d_codes = daily.get("weather_code", [])[:7]
-                    d_winds = daily.get("wind_speed_10m_max", [])[:7]
+                # Extract 7 days daily
+                daily_list = []
+                d_times = daily.get("time", [])[:7]
+                d_max = daily.get("temperature_2m_max", [])[:7]
+                d_min = daily.get("temperature_2m_min", [])[:7]
+                d_rain = daily.get("precipitation_probability_max", [])[:7]
+                d_sum = daily.get("precipitation_sum", [])[:7]
+                d_codes = daily.get("weather_code", [])[:7]
+                d_winds = daily.get("wind_speed_10m_max", [])[:7]
 
-                    for i in range(len(d_times)):
-                        daily_list.append({
-                            "date": d_times[i],
-                            "temp_max": d_max[i] if i < len(d_max) else 30.0,
-                            "temp_min": d_min[i] if i < len(d_min) else 20.0,
-                            "rain_prob": d_rain[i] if i < len(d_rain) else 20,
-                            "precip_sum_mm": d_sum[i] if i < len(d_sum) else 0.0,
-                            "condition": cls._wmo_code_to_str(d_codes[i] if i < len(d_codes) else 0),
-                            "wind_max": d_winds[i] if i < len(d_winds) else 15.0
-                        })
+                for i in range(len(d_times)):
+                    daily_list.append({
+                        "date": d_times[i],
+                        "temp_max": d_max[i] if i < len(d_max) else 30.0,
+                        "temp_min": d_min[i] if i < len(d_min) else 20.0,
+                        "rain_prob": d_rain[i] if i < len(d_rain) else 20,
+                        "precip_sum_mm": d_sum[i] if i < len(d_sum) else 0.0,
+                        "condition": cls._wmo_code_to_str(d_codes[i] if i < len(d_codes) else 0),
+                        "wind_max": d_winds[i] if i < len(d_winds) else 15.0
+                    })
 
-                    result = {
-                        "location": location_name or f"Lat {lat:.2f}, Lon {lon:.2f}",
-                        "latitude": lat,
-                        "longitude": lon,
-                        "hourly": hourly_list,
-                        "daily": daily_list,
-                        "synced_at": datetime.utcnow().isoformat()
-                    }
-                    cls._cache[cache_key] = {
-                        "data": result,
-                        "expires_at": now + timedelta(minutes=10)
-                    }
-                    return result
-            except Exception as e:
-                print(f"Detailed forecast fetch error: {e}")
+                result = {
+                    "location": location_name or f"Lat {lat:.2f}, Lon {lon:.2f}",
+                    "latitude": lat,
+                    "longitude": lon,
+                    "hourly": hourly_list,
+                    "daily": daily_list,
+                    "synced_at": datetime.utcnow().isoformat()
+                }
+                cls._cache[cache_key] = {
+                    "data": result,
+                    "expires_at": now + timedelta(minutes=10)
+                }
+                return result
+        except Exception as e:
+            print(f"Detailed forecast fetch error: {e}")
 
         # Fallback synthetic forecast if offline
         return cls._generate_fallback_detailed_forecast(lat, lon, location_name)

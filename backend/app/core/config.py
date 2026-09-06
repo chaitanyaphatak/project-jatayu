@@ -43,7 +43,11 @@ class Settings(BaseSettings):
     MAPBOX_ACCESS_TOKEN: str = ""
 
     class Config:
-        env_file = ".env"
+        env_file = (
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.env")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.env")),
+            ".env"
+        )
         extra = "ignore"
 
 settings = Settings()

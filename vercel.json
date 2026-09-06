@@ -4,20 +4,8 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/api/v1/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
       "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/docs",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/openapi.json",
-      "destination": "/api/index.py"
+      "destination": "https://jatayu-backend.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",

@@ -24,6 +24,7 @@ export default defineConfig({
   root: 'frontend',
   customLogger: logger,
   plugins: [react()],
+  envDir: resolve(__dirname, '.'),
   publicDir: resolve(__dirname, 'assets'),
   build: {
     outDir: resolve(__dirname, 'dist'),
