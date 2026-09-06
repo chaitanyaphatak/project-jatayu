@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://jatayu-backend.onrender.com/api/$1"
+      "destination": "https://jatayu-backend-kf1f.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",
