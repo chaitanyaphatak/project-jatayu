@@ -137,19 +137,22 @@ async def get_spray_safety(
         w_val = wind_kmh
         r_val = rain_prob
 
-        # If lat/lon provided and inputs are missing, fetch live weather from open-meteo
-        if lat is not None and lon is not None and (t_val is None or h_val is None or w_val is None):
+        # If lat/lon provided and any inputs are missing, fetch live weather from open-meteo
+        if lat is not None and lon is not None and (t_val is None or h_val is None or w_val is None or r_val is None):
             try:
                 import httpx
                 url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,precipitation&hourly=precipitation_probability&timezone=auto"
-                async with httpx.AsyncClient(timeout=4.0) as client:
-                    res = await client.get(url)
+                with httpx.Client(timeout=3.5) as client:
+                    res = client.get(url)
                     if res.status_code == 200:
                         d = res.json()
                         curr = d.get("current", {})
-                        if t_val is None: t_val = float(curr.get("temperature_2m", 28.5))
-                        if h_val is None: h_val = float(curr.get("relative_humidity_2m", 60.0))
-                        if w_val is None: w_val = float(curr.get("wind_speed_10m", 10.0))
+                        if t_val is None and "temperature_2m" in curr:
+                            t_val = float(curr["temperature_2m"])
+                        if h_val is None and "relative_humidity_2m" in curr:
+                            h_val = float(curr["relative_humidity_2m"])
+                        if w_val is None and "wind_speed_10m" in curr:
+                            w_val = float(curr["wind_speed_10m"])
                         if r_val is None:
                             hourly_probs = d.get("hourly", {}).get("precipitation_probability", [0])
                             r_val = float(hourly_probs[0]) if hourly_probs else 0.0
@@ -162,7 +165,7 @@ async def get_spray_safety(
         w = 10.0 if w_val is None else float(w_val)
         r = 15.0 if r_val is None else float(r_val)
 
-        delta_t_result = engine.calculate_delta_t(t, h)
+        delta_t_result = engine.calculate_delta_t(t, h) or {}
         wind_result = _wind_check(w)
         rain_result = _rain_check(r)
         decision = _compute_decision(delta_t_result, wind_result, rain_result)
@@ -170,7 +173,6 @@ async def get_spray_safety(
         # Next safe window heuristic (IST-based)
         try:
             from datetime import datetime, timezone, timedelta
-            # IST is UTC + 5:30
             ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
             hour = ist_now.hour
         except Exception:
@@ -188,6 +190,9 @@ async def get_spray_safety(
         else:
             next_window = "Tomorrow 06:00 AM – 09:00 AM IST"
 
+        dt_celsius = delta_t_result.get("delta_t_celsius")
+        dt_val_display = f"{float(dt_celsius):.1f}°C" if dt_celsius is not None else "5.0°C"
+
         return {
             "location": location_name or "Your Location",
             "crop": {"type": crop_type or "Soybean", "stage": crop_stage or "Flowering"},
@@ -195,7 +200,7 @@ async def get_spray_safety(
             "factors": {
                 "delta_t": {
                     "label": "Delta-T (Droplet Safety)",
-                    "value": f"{delta_t_result.get('delta_t_celsius', 5.0):.1f}°C",
+                    "value": dt_val_display,
                     "safe_range": "2°C – 8°C",
                     "status": delta_t_result.get("status", "EXCELLENT"),
                     "color": delta_t_result.get("color", "emerald"),
