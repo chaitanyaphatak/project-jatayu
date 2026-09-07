@@ -152,7 +152,7 @@ export default function OverviewPage({
 
   const activeThemeKey = overrideTheme || autoThemeKey
   const activeThemeConfig = WEATHER_THEMES[activeThemeKey]
-  const isDarkTheme = activeThemeConfig.isNight || activeThemeConfig.type === 'night' || activeThemeConfig.type === 'stormy' || activeThemeConfig.type === 'rainy'
+  const isDarkTheme = activeThemeConfig.isNight || activeThemeConfig.type === 'stormy' || activeThemeConfig.type === 'rainy'
 
   // Weekly Days data list
   const dailyList = useMemo(() => {

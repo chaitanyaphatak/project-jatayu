@@ -367,10 +367,34 @@ npm run dev
 | **Backend REST API** | **Render Cloud (Singapore)** | [https://jatayu-backend-kf1f.onrender.com](https://jatayu-backend-kf1f.onrender.com) |
 | **Interactive API Docs** | **Swagger UI** | [https://jatayu-backend-kf1f.onrender.com/docs](https://jatayu-backend-kf1f.onrender.com/docs) |
 | **System Health Check** | **Render Web Service** | [https://jatayu-backend-kf1f.onrender.com/api/v1/health](https://jatayu-backend-kf1f.onrender.com/api/v1/health) |
+| **Keepalive Ping** | **Render Web Service** | [https://jatayu-backend-kf1f.onrender.com/api/v1/ping](https://jatayu-backend-kf1f.onrender.com/api/v1/ping) |
 
 ---
 
-## 👨‍💻 8. Author & Lead Architect
+## 🔄 8. Backend Keepalive (Render Free Tier)
+
+Render's free tier suspends web services after **15 minutes of inactivity**. To prevent cold starts in production, two free external monitoring services continuously ping the `/api/v1/ping` endpoint every 5–10 minutes:
+
+| Service | Interval | Purpose | Link |
+|---|---|---|---|
+| **UptimeRobot** | Every **5 min** | Primary keepalive + uptime monitoring + downtime alerts | [uptimerobot.com](https://uptimerobot.com) |
+| **cron-job.org** | Every **10 min** | Secondary backup pinger (redundancy) | [cron-job.org](https://cron-job.org) |
+
+### Ping Endpoint
+```
+GET /api/v1/ping  →  {"pong": true}
+```
+This endpoint performs **zero database or config calls** — it is the lightest possible response, purpose-built for keepalive monitoring.
+
+### Setup (if re-deploying)
+1. **UptimeRobot** → Add HTTP monitor → URL: `https://jatayu-backend-kf1f.onrender.com/api/v1/ping` → Interval: 5 min
+2. **cron-job.org** → Create cronjob → Same URL → Schedule: `*/10 * * * *`
+
+> **Note:** Both services are on free plans. Combined they ensure the backend stays warm 24/7 at ₹0 cost.
+
+---
+
+## 👨‍💻 9. Author & Lead Architect
 
 Developed and Architected with ❤️ by:
 

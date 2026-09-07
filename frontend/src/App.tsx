@@ -247,12 +247,12 @@ export default function App() {
 
     // Instant local cache swap if available
     const cached = getCachedWeather(loc.lat, loc.lon)
-    if (cached) {
-      setWeather(cached)
+    if (cached.data) {
+      setWeather(cached.data)
     }
 
     // Trigger instant fresh fetch for the new location
-    fetchLiveWeather(loc.lat, loc.lon, loc.name, !!cached)
+    fetchLiveWeather(loc.lat, loc.lon, loc.name, !!cached.data)
     fetchLiveAlerts(loc.lat, loc.lon)
     fetchCrowdData(loc.lat, loc.lon)
   }
