@@ -4,7 +4,7 @@ import { SignedIn, SignedOut, SignInButton, SignUpButton, useUser, useClerk } fr
 import { 
   BarChart3, Calendar, AlertTriangle, Layers, 
   Sparkles, Sprout, Users, TrendingUp, Settings, X, CloudRain, Award,
-  MapPin, ShieldCheck, CheckCircle2, LogIn, UserPlus, LogOut, User
+  MapPin, ShieldCheck, CheckCircle2, LogIn, UserPlus, LogOut, User, FlaskConical
 } from 'lucide-react'
 
 export default function MobileNav({ isOpen, onClose, currentLocation, trustScore }) {
@@ -19,6 +19,7 @@ export default function MobileNav({ isOpen, onClose, currentLocation, trustScore
     { to: '/maps', label: 'Interactive Maps', icon: Layers },
     { to: '/chat', label: 'Vayu AI Assistant', icon: Sparkles, badge: 'AI', badgeColor: 'bg-sky-100 text-sky-700' },
     { to: '/advisory', label: 'Farmer & Aviation Guide', icon: Sprout },
+    { to: '/spray-safety', label: 'Spray Safety GO/NO-GO', icon: FlaskConical, badge: 'NEW', badgeColor: 'bg-emerald-100 text-emerald-800' },
     { to: '/community', label: 'Community Reports', icon: Users },
     { to: '/climate', label: 'Climate & History', icon: TrendingUp },
     { to: '/settings', label: 'Settings', icon: Settings }

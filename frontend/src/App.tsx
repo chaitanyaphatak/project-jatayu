@@ -20,6 +20,7 @@ import AdvisoryPage from './pages/AdvisoryPage'
 import CommunityPage from './pages/CommunityPage'
 import ClimatePage from './pages/ClimatePage'
 import SettingsPage from './pages/SettingsPage'
+import SpraySafetyPage from './pages/SpraySafetyPage'
 
 import { LocationItem, WeatherData, SystemAlert, CrowdReport, UserRole } from './types'
 import { getCachedWeather, setCachedWeather } from './utils/weatherCache'
@@ -587,6 +588,16 @@ export default function App() {
                     onSelectLocation={handleSelectLocation}
                     language={language}
                     setLanguage={handleSetLanguage}
+                  />
+                } 
+              />
+              <Route 
+                path="/spray-safety" 
+                element={
+                  <SpraySafetyPage 
+                    currentLocation={currentLocation}
+                    weather={weather}
+                    cropStage={cropStage}
                   />
                 } 
               />

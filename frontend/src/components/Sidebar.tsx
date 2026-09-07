@@ -4,7 +4,7 @@ import {
   BarChart3, Calendar, AlertTriangle, Layers, Sparkles, 
   Sprout, Users, TrendingUp, Settings, CloudRain, 
   Award, PanelLeftClose, PanelLeftOpen, MapPin, Radio,
-  ShieldCheck, Activity
+  ShieldCheck, Activity, FlaskConical
 } from 'lucide-react'
 
 export default function Sidebar({ 
@@ -23,6 +23,7 @@ export default function Sidebar({
     { to: '/maps', label: 'Interactive Maps & Radar', icon: Layers },
     { to: '/chat', label: 'Vayu AI Assistant', icon: Sparkles, badge: 'AI', badgeColor: 'bg-sky-100 text-sky-700' },
     { to: '/advisory', label: 'Farmer & Aviation Guide', icon: Sprout },
+    { to: '/spray-safety', label: 'Spray Safety GO/NO-GO', icon: FlaskConical, badge: 'NEW', badgeColor: 'bg-emerald-100 text-emerald-800' },
     { to: '/community', label: 'Community Reports', icon: Users },
     { to: '/climate', label: 'Climate & History', icon: TrendingUp },
     { to: '/settings', label: 'Settings', icon: Settings }
