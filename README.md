@@ -394,13 +394,84 @@ This endpoint performs **zero database or config calls** — it is the lightest 
 
 ---
 
-## 👨‍💻 9. Author & Lead Architect
+## 👨‍💻 9. Team & Contributors
 
 Developed and Architected with ❤️ by:
 
-**Chaitanya Phatak**  
-*Full-Stack & Machine Learning Engineer*  
-GitHub: [@chaitanyaphatak](https://github.com/chaitanyaphatak)
+<table align="center">
+  <tr>
+    <td align="center" width="180">
+      <a href="https://github.com/chaitanyaphatak">
+        <img src="https://github.com/chaitanyaphatak.png" width="100" height="100" style="border-radius:50%;" alt="Chaitanya Phatak"/>
+        <br />
+        <sub><b>Chaitanya Phatak</b></sub>
+      </a>
+      <br />
+      <sub>Full-Stack & ML Engineer</sub>
+      <br />
+      <a href="https://github.com/chaitanyaphatak">@chaitanyaphatak</a>
+    </td>
+    <td align="center" width="180">
+      <a href="https://github.com/sharadtejankar-19">
+        <img src="https://github.com/GITHUB_USERNAME_2.png" width="100" height="100" style="border-radius:50%;" alt="Member 2"/>
+        <br />
+        <sub><b>Sharad Tejankar</b></sub>
+      </a>
+      <br />
+      <sub>Designer</sub>
+      <br />
+      <a href="https://github.com/sharadtejankar-19">@GITHUB_USERNAME_2</a>
+    </td>
+    <td align="center" width="180">
+      <a href="https://github.com/GITHUB_USERNAME_3">
+        <img src="https://github.com/GITHUB_USERNAME_3.png" width="100" height="100" style="border-radius:50%;" alt="Member 3"/>
+        <br />
+        <sub><b>Full Name 3</b></sub>
+      </a>
+      <br />
+      <sub>Role / Contribution 3</sub>
+      <br />
+      <a href="https://github.com/GITHUB_USERNAME_3">@GITHUB_USERNAME_3</a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="180">
+      <a href="https://github.com/GITHUB_USERNAME_4">
+        <img src="https://github.com/GITHUB_USERNAME_4.png" width="100" height="100" style="border-radius:50%;" alt="Member 4"/>
+        <br />
+        <sub><b>Full Name 4</b></sub>
+      </a>
+      <br />
+      <sub>Role / Contribution 4</sub>
+      <br />
+      <a href="https://github.com/GITHUB_USERNAME_4">@GITHUB_USERNAME_4</a>
+    </td>
+    <td align="center" width="180">
+      <a href="https://github.com/GITHUB_USERNAME_5">
+        <img src="https://github.com/GITHUB_USERNAME_5.png" width="100" height="100" style="border-radius:50%;" alt="Member 5"/>
+        <br />
+        <sub><b>Full Name 5</b></sub>
+      </a>
+      <br />
+      <sub>Role / Contribution 5</sub>
+      <br />
+      <a href="https://github.com/GITHUB_USERNAME_5">@GITHUB_USERNAME_5</a>
+    </td>
+    <td align="center" width="180">
+      <a href="https://github.com/GITHUB_USERNAME_6">
+        <img src="https://github.com/GITHUB_USERNAME_6.png" width="100" height="100" style="border-radius:50%;" alt="Member 6"/>
+        <br />
+        <sub><b>Full Name 6</b></sub>
+      </a>
+      <br />
+      <sub>Role / Contribution 6</sub>
+      <br />
+      <a href="https://github.com/GITHUB_USERNAME_6">@GITHUB_USERNAME_6</a>
+    </td>
+  </tr>
+</table>
+
+> Replace `GITHUB_USERNAME_2` … `GITHUB_USERNAME_6`, the full names, and roles above with each teammate's actual GitHub username, name, and contribution.
 
 ---
 
