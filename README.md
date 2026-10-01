@@ -413,14 +413,14 @@ Developed and Architected with ❤️ by:
     </td>
     <td align="center" width="180">
       <a href="https://github.com/sharadtejankar-19">
-        <img src="https://github.com/GITHUB_USERNAME_2.png" width="100" height="100" style="border-radius:50%;" alt="Member 2"/>
+        <img src="https://github.com/sharadtejankar-19.png" width="100" height="100" style="border-radius:50%;" alt="Member 2"/>
         <br />
         <sub><b>Sharad Tejankar</b></sub>
       </a>
       <br />
       <sub>Designer</sub>
       <br />
-      <a href="https://github.com/sharadtejankar-19">@GITHUB_USERNAME_2</a>
+      <a href="https://github.com/sharadtejankar-19">@sharadtejankar-19</a>
     </td>
     <td align="center" width="180">
       <a href="https://github.com/GITHUB_USERNAME_3">
