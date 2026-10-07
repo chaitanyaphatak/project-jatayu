@@ -423,15 +423,15 @@ Developed and Architected with ❤️ by:
       <a href="https://github.com/sharadtejankar-19">@sharadtejankar-19</a>
     </td>
     <td align="center" width="180">
-      <a href="https://github.com/GITHUB_USERNAME_3">
-        <img src="https://github.com/GITHUB_USERNAME_3.png" width="100" height="100" style="border-radius:50%;" alt="Member 3"/>
+      <a href="https://github.com/sayalikulkarni-tech">
+        <img src="https://github.com/sayalikulkarni-tech.png" width="100" height="100" style="border-radius:50%;" alt="Member 3"/>
         <br />
-        <sub><b>Full Name 3</b></sub>
+        <sub><b>sayali kulkarni</b></sub>
       </a>
       <br />
-      <sub>Role / Contribution 3</sub>
+      <sub>frontend developer</sub>
       <br />
-      <a href="https://github.com/GITHUB_USERNAME_3">@GITHUB_USERNAME_3</a>
+      <a href="https://github.com/sayalikulkarni-tech.png">@sayalikulkarni-tech</a>
     </td>
   </tr>
   <tr>
